@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path
+    d="M 0,100 L 8.33,100 L 16.67,99.99 L 25,99.64 L 33.33,96.6 L 41.67,80.2 L 50,39.35 L 58.33,5.4 L 62.5,0 L 66.67,5.4 L 75,39.35 L 83.33,80.2 L 91.67,96.6 L 100,99.64"
+    fill="none"
+    stroke="#eab308"
+    stroke-width="2"
+    stroke-dasharray="4 4"
+  />
+</svg>

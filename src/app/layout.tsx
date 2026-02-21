@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Omnivora",
-  description: "Obiettivi macro, storico pasti, laboratorio ingredienti",
+  description: "Piattaforma per obiettivi macro, storico pasti e laboratorio ingredienti",
 };
 
 export default function RootLayout({
