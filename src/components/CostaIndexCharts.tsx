@@ -1,7 +1,7 @@
 'use client';
 
 import type { ScanResult } from '@/lib/scan';
-import { getEffectiveProfile, RADAR_LABELS } from '@/lib/scan';
+import { getEffectiveProfile, RADAR_LABELS, getCostaIndexChartData } from '@/lib/scan';
 
 export function itemColor(index: number, total: number): string {
   const hue = total > 0 ? (index * 137.5) % 360 : 0;
@@ -90,48 +90,8 @@ export function CostaIndexSystemicChart({ item }: { item: ScanResult | null }) {
   const toX = (t: number) => marginL + (t / tMax) * chartW;
   const toY = (v: number) => marginT + chartH - (Math.min(yMax, Math.max(0, v)) / yMax) * chartH;
 
-  const d = item.d ?? 0;
-  const s = item.s ?? 0;
-  const a = item.a ?? 0;
-  const b = item.b ?? 0;
-  const u = item.u ?? 0;
-  const temp = item.temp ?? 20;
-  const melting = item.melting ?? 0;
-  const k = item.k ?? 0.3;
-  const magnitudo = (item.magnitudo ?? 0) > 0 ? item.magnitudo! : Math.sqrt(d * d + s * s + a * a + b * b + u * u);
-
-  // Ebbrezza Neurale (il piacere che stordisce) — scala 0–100 per grafico
-  const Eb = (magnitudo * 1.5) + (melting * 2) + (Math.abs(37 - temp) / 10);
-  const EbNorm = Math.min(100, (Eb / 15) * 100);
-
-  // Il Conto Metabolico (quanto ti costa)
-  const R_gly = Math.max(0, d - (b * 2)) / 2;
-  const R_hep = (u * s * melting) / 40;
-  const R_dop = Math.max(0, magnitudo - 5) * k;
-  const Conto = 1.0 + R_gly + R_hep + R_dop;
-  const ContoFaticaNorm = Math.min(100, (R_hep / 2) * 100);
-
-  const Gmax = Math.min(100, R_gly * 50);
-  const SensMax = (Math.min(1, (a + s) / 10) / 1) * 100;
-
-  let ptsEbbrezza = '';
-  let ptsSensory = '';
-  let ptsGBR = '';
-  let ptsContoFatica = '';
-  let ptsWindow = '';
-
-  for (let t = 0; t <= tMax; t += 2) {
-    const ebbrezzaY = EbNorm * Math.exp(-k * t * 4);
-    const sensoryY = SensMax * Math.exp(-t / 15);
-    const gbrY = Gmax * (t / 30) * Math.exp(1 - t / 30);
-    const contoFaticaY = ContoFaticaNorm * (1 - Math.exp(-t / 40));
-    const windowY = 100 * Math.exp(-t / 45);
-    ptsEbbrezza += `${toX(t)},${toY(ebbrezzaY)} `;
-    ptsSensory += `${toX(t)},${toY(sensoryY)} `;
-    ptsGBR += `${toX(t)},${toY(gbrY)} `;
-    ptsContoFatica += `${toX(t)},${toY(contoFaticaY)} `;
-    ptsWindow += `${toX(t)},${toY(windowY)} `;
-  }
+  const chart = getCostaIndexChartData(item, { tMax, step: 2, toX, toY });
+  const { ptsEbbrezza, ptsContoFatica, ptsGBR, ptsSensory, ptsWindow, R_gly, R_hep, R_dop, Conto } = chart;
 
   return (
     <div className="flex flex-col">
@@ -166,26 +126,37 @@ export function CostaIndexSystemicChart({ item }: { item: ScanResult | null }) {
           <circle cx="90" cy="14" r="3" fill="#22c55e" /><text x="96" y="17" fill="#22c55e" fontSize="8" fontWeight="bold">Metabolic Window</text>
         </g>
       </svg>
-      <div className="mt-4 p-4 bg-zinc-900/60 border border-zinc-700 rounded-b-xl text-xs text-zinc-300 space-y-3">
+      <div className="mt-4 p-4 bg-zinc-900/60 border border-zinc-700 rounded-b-xl text-xs text-zinc-300 space-y-4">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-          <p className="font-bold text-zinc-400 uppercase tracking-wider">Ebbrezza vs Conto</p>
+          <p className="font-bold text-zinc-400 uppercase tracking-wider">Legenda — Spettro Sistemico (0–120 min)</p>
           <span className="text-zinc-500 font-mono">Conto: {Conto.toFixed(2)}x</span>
         </div>
-        <p className="leading-relaxed">
-          <strong className="text-[#eab308] mr-1">Ebbrezza Neurale:</strong>{' '}
-          Potere inebriante del campione. Più è alto, più il reward dopaminergico è violento.
+        <p className="text-zinc-500 italic border-b border-zinc-800 pb-2">
+          L&apos;asse orizzontale è il tempo dopo l&apos;ingestione (minuti). L&apos;asse verticale è l&apos;intensità percentuale (0–100%) di ogni fenomeno. Ogni curva mostra come quel fattore evolve nel tempo.
         </p>
         <p className="leading-relaxed">
-          <strong className="text-[#ef4444] mr-1">Il Conto:</strong>{' '}
-          La resistenza termodinamica del tuo corpo. Se supera l&apos;ebbrezza, sei in debito biologico.
+          <strong className="text-[#eab308] mr-1">Ebbrezza Neurale (giallo):</strong>{' '}
+          Il potere inebriante del campione: quanto è forte il reward dopaminergico al primo morso. La curva mostra il decadimento nel tempo (P(t) = P0 · e^(-k·t)). Più è alta e più scende in fretta, più il cervello cerca il prossimo morso senza registrare sazietà.
         </p>
         <p className="leading-relaxed">
-          <strong className="text-[#3b82f6] mr-1">Attrito Glicemico (R_gly):</strong>{' '}
-          {R_gly > 0.5 ? 'Dolce non bilanciato da amaro: picco insulinico e letargia a 30 min.' : 'Profilo bilanciato; assorbimento più graduale.'}
+          <strong className="text-[#3b82f6] mr-1">GBR — Glicemia / Attrito Glicemico (blu):</strong>{' '}
+          Modella il picco insulinico legato allo squilibrio dolce vs amaro (R_gly). Sale verso i 30 min e poi scende: se il picco è alto, segue letargia e calo energetico. Profilo bilanciato = curva più bassa e assorbimento più graduale.
         </p>
         <p className="leading-relaxed">
-          <strong className="text-[#a855f7] mr-1">Debito di Sazietà (R_dop):</strong>{' '}
-          {R_dop > 0.5 ? 'Loop edonico: magnitudo alta e decadimento rapido; il cervello non registra sazietà.' : 'Sapore persistente; sazietà meccanica e neurale favorita.'}
+          <strong className="text-[#ef4444] mr-1">Il Conto — Fatica epatica/digestiva (rosso):</strong>{' '}
+          La resistenza termodinamica del corpo: carico da umami × sale × grassi (R_hep). La curva sale nel tempo (food coma). Se supera l&apos;ebbrezza in intensità, sei in debito biologico: il pasto ti “costa” più di quanto ti dà in piacere duraturo.
+        </p>
+        <p className="leading-relaxed">
+          <strong className="text-[#a855f7] mr-1">Stress sensoriale (viola):</strong>{' '}
+          Densità osmotica e shock termico (acido + sale, temperatura vs texture). Alta quando sale e acido sono elevati: stress sulle mucose e rischio disidratazione recettoriale. Decade nel tempo.
+        </p>
+        <p className="leading-relaxed">
+          <strong className="text-[#22c55e] mr-1">Metabolic Window (verde, tratteggiata):</strong>{' '}
+          La finestra teorica in cui l&apos;organismo è più recettivo ai nutrienti (glicogeno, proteine, riparazione tissutale). Decade con costante tempo ~45 min: dopo l&apos;ingestione hai una finestra in cui ciò che mangi viene utilizzato in modo più efficiente; oltre quella, il “conto” metabolico e la fatica digestiva tendono a dominare. Allineare il pasto a questa curva significa massimizzare il rapporto beneficio/costo.
+        </p>
+        <p className="leading-relaxed pt-1 border-t border-zinc-700">
+          <strong className="text-zinc-400">Debito di Sazietà (R_dop):</strong>{' '}
+          {R_dop > 0.5 ? 'Loop edonico rilevato: magnitudo alta e decadimento rapido (k elevato); il cervello non registra sazietà e spinge a ripetere.' : 'Sapore persistente; sazietà meccanica e neurale favorita.'}
         </p>
       </div>
     </div>

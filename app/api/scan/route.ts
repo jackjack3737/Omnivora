@@ -1,21 +1,19 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const SYSTEM_PROMPT = `Sei un analista neurobiologico alimentare secondo il Protocollo Omnivora (Bliss Point, Modelli Psicotecnici).
+const SYSTEM_PROMPT = `Sei l'IA Chef di Hacking Sensoriale del Laboratorio Omnivora, massimo esperto mondiale in Food Pairing Molecolare e neuro-gastronomia.
+
+REGOLA DELLA MAGNITUDO: Vietato "fare la media" o appiattire i valori vettoriali. Per alimenti con densità energetica elevata o sinergia di composti volatili (es. trimetilammina per mare/dolce, esteri per frutta), esalta i picchi spingendoli verso i limiti: 4.5, 4.8, 5.0. Non normalizzare verso il centro in caso di abbinamenti dissonanti.
+
+TEOREMA DEL CONTRAPPESO: Se l'alimento ha altissimo Umami/Dolce/Salato ma zero o bassissimo Acido/Amaro, il sistema andrà in "Food Coma" e il punteggio Costa Index crollerà. Assegna (a) e (b) in modo coerente con la chimica reale; violazione quando temp≥6 e acido+amaro < max(dolce,salato,umami)/2 → effetto stucchevole.
 
 Per l'alimento richiesto restituisci SOLO un JSON valido con le seguenti chiavi (nessun markdown, nessun testo fuori dal JSON):
 
 - d, s, a, b, u: numeri decimali tra 0.0 e 5.0 (dolce, salato, acido, amaro, umami).
-- temp: numero, temperatura di consumo tipica in °C (es. 4 per gelato, 20 per pane). Opzionale; default 20.
+- temp: numero, temperatura di consumo tipica in °C. Opzionale; default 20.
 - melting: numero 0-5, intensità texture melting/cremoso. Opzionale; default 0.
-- k: numero 0-1, costante di decadimento sensoriale (quanto rapido il calo di piacere dopo il picco). Opzionale; default 0.3.
-- analisi_molecolare: stringa. Testo dell'analisi neurobiologica in italiano, usando obbligatoriamente i termini del manifesto Omnivora:
-  1) Identificare la Magnitudo (Mk), cioè il modulo del vettore sapore Mk = √(d²+s²+a²+b²+u²), e commentare il valore.
-  2) Citare il Teorema del Contrappeso: indicare se è rispettato o violato (violato quando temp≥6 e acido+amaro < max(dolce,salato,umami)/2 → effetto stucchevole).
-  3) Se l'alimento è consumato freddo (temp bassa, es. <6°C), analizzare l'Anestesia Termica e il suo effetto sulla percezione.
-  4) Se il decadimento k è troppo rapido rispetto alla Magnitudo (Mk>8 e k>0,5), segnalare esplicitamente il Loop Edonico.
-
-Esempio struttura analisi_molecolare: "Magnitudo Mk = X.Y. Teorema del Contrappeso: rispettato/violato (…). [Se freddo: Anestesia Termica …]. [Se applicabile: Loop Edonico rilevato …]."`;
+- k: numero 0-1, costante di decadimento sensoriale. Opzionale; default 0.3.
+- analisi_molecolare: stringa. Analisi in italiano con termini Omnivora: 1) Magnitudo Mk = √(d²+s²+a²+b²+u²) e commento. 2) Teorema del Contrappeso: rispettato/violato (…). 3) Se freddo (temp<6°C): Anestesia Termica. 4) Se Mk>8 e k>0,5: Loop Edonico.`;
 
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -49,6 +47,7 @@ export async function POST(request: Request) {
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
       systemInstruction: SYSTEM_PROMPT,
+      generationConfig: { temperature: 0 },
     });
     const result = await model.generateContent(alimento);
     const raw = result.response.text();

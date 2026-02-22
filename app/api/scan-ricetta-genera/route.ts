@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const SYSTEM_PROMPT = `Sei uno chef. Ricevi una ricetta base, il nome di un'opzione (es. "Opzione A"), l'elenco degli ingredienti base con grammature e l'elenco degli ingredienti da aggiungere (correttivi) con grammature.
+const SYSTEM_PROMPT = `Sei l'IA Chef di Hacking Sensoriale del Laboratorio Omnivora, esperto in Food Pairing Molecolare e neuro-gastronomia. Generi procedure replicabili che rispettano il bilanciamento d/s/a/b/u (pentagono sensoriale).
 
-Devi generare una RICETTA MOLTO DETTAGLIATA per quella opzione: stessa ricetta base ma con i correttivi integrati. Restituisci SOLO un JSON valido (nessun markdown) con una chiave "passaggi" che è un array di stringhe. Ogni stringa è un passaggio numerato della procedura.
+Ricevi: ricetta base, nome opzione, ingredienti base con grammature, correttivi (ingredienti molecolari/ponte) con grammature.
+
+Compito: generare una RICETTA MOLTO DETTAGLIATA per quell'opzione (base + correttivi integrati). Restituisci SOLO un JSON valido (nessun markdown) con chiave "passaggi": array di stringhe (passaggi numerati).
 
 Requisiti:
-- Almeno 8-15 passaggi. Scrivi in italiano.
-- Per ogni passaggio indica quantità (grammi, cucchiai, ecc.), tempi (minuti), temperature (°C o fuoco) dove applicabile.
-- Includi: preparazione ingredienti base, ordine delle operazioni, cotture con tempi e temperature, momento esatto in cui aggiungere ogni correttivo, eventuale riposo o raffreddamento, impiattamento e servizio.
-- Procedura replicabile e chiara (es. "1. Lavare e asciugare i 150 g di pomodori. Tagliarli a cubetti. 2. In una ciotola unire... 3. Cuocere in padella a 120 °C per 8 minuti. 4. Aggiungere i 20 g di limone (succo) e mescolare. 5. ...").
-- Non aggiungere testo fuori dal JSON.`;
+- Almeno 8-15 passaggi. Italiano.
+- Per ogni passaggio: quantità (grammi, cucchiai), tempi (minuti), temperature (°C o fuoco).
+- Includi: preparazione base, ordine operazioni, cotture con tempi/temperature, momento esatto in cui aggiungere ogni correttivo (es. acidi/amari per chiudere il pentagono), riposo/raffreddamento, impiattamento.
+- Procedura replicabile (es. "1. Lavare i 150 g di pomodori... 2. ... 4. Aggiungere i 20 g di succo di yuzu e mescolare.").
+- Nessun testo fuori dal JSON.`;
 
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -47,6 +49,7 @@ export async function POST(request: Request) {
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
       systemInstruction: SYSTEM_PROMPT,
+      generationConfig: { temperature: 0 },
     });
 
     const ingredientiText = ingredienti

@@ -23,13 +23,14 @@ import {
   virtualWeight,
   computePiattoFromResults,
   computeCorrectedFromResults,
+  computeCostaIndex,
 } from '@/lib/scan';
 import { RadarChartPentagon } from '@/components/RadarChart';
 import { LaboratoryReport01 } from '@/components/LaboratoryReport';
 import { AddToCostaIndexButton } from '@/components/AddToCostaIndexButton';
 import { itemColor, CostaIndexRadarMulti, CostaIndexSystemicChart } from '@/components/CostaIndexCharts';
 
-type TabId = 'sintetizzatore' | 'ottimizzatore' | 'svuota-frigo' | 'radar-km0' | 'scan-detector' | 'scan-ricette' | 'costa-index';
+type TabId = 'sintetizzatore' | 'ottimizzatore' | 'svuota-frigo' | 'radar-km0' | 'scan-detector' | 'costa-index';
 
 type Microelementi = {
   ingrediente_id?: string;
@@ -72,10 +73,9 @@ function toNum(v: unknown): number {
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'scan-detector', label: 'Scan Detector' },
-  { id: 'scan-ricette', label: 'Scan Ricette' },
   { id: 'costa-index', label: 'Costa Index' },
+  { id: 'ottimizzatore', label: 'Ottimizzatore Ricette' },
   { id: 'sintetizzatore', label: 'Sintetizzatore Vegano' },
-  { id: 'ottimizzatore', label: 'Ottimizzatore Chef' },
   { id: 'svuota-frigo', label: 'Svuota Frigo' },
   { id: 'radar-km0', label: 'Radar Km 0' },
 ];
@@ -279,30 +279,10 @@ export default function Home() {
         </nav>
 
         {activeTab === 'sintetizzatore' && <TabSintetizzatoreVegano />}
-        {activeTab === 'ottimizzatore' && (
-          <TabOttimizzatoreChef
-            query={query}
-            setQuery={setQuery}
-            cercaIngredienti={cercaIngredienti}
-            searching={searching}
-            risultati={risultati}
-            aggiungiAlPiatto={aggiungiAlPiatto}
-            piatto={piatto}
-            rimuoviDaPiatto={rimuoviDaPiatto}
-            descrizionePasto={descrizionePasto}
-            setDescrizionePasto={setDescrizionePasto}
-            totali={totali}
-            mediaPesata={mediaPesata}
-            MAG={MAG}
-            salvaPasto={salvaPasto}
-            saving={saving}
-            message={message}
-          />
-        )}
+        {activeTab === 'ottimizzatore' && <TabOttimizzatoreRicette />}
         {activeTab === 'svuota-frigo' && <TabSvuotaFrigo />}
         {activeTab === 'radar-km0' && <TabRadarKm0 />}
         {activeTab === 'scan-detector' && <TabScanDetector />}
-        {activeTab === 'scan-ricette' && <TabScanRicette />}
         {activeTab === 'costa-index' && <TabCostaIndex />}
       </div>
     </div>
@@ -342,170 +322,6 @@ function TabSintetizzatoreVegano() {
         </p>
       )}
     </section>
-  );
-}
-
-function TabOttimizzatoreChef({
-  query,
-  setQuery,
-  cercaIngredienti,
-  searching,
-  risultati,
-  aggiungiAlPiatto,
-  piatto,
-  rimuoviDaPiatto,
-  descrizionePasto,
-  setDescrizionePasto,
-  totali,
-  mediaPesata,
-  MAG,
-  salvaPasto,
-  saving,
-  message,
-}: {
-  query: string;
-  setQuery: (s: string) => void;
-  cercaIngredienti: () => void;
-  searching: boolean;
-  risultati: Ingrediente[];
-  aggiungiAlPiatto: (ing: Ingrediente, grammi: number) => void;
-  piatto: VocePiatto[];
-  rimuoviDaPiatto: (id: string) => void;
-  descrizionePasto: string;
-  setDescrizionePasto: (s: string) => void;
-  totali: { proteine: number; carboidrati: number; grassi: number };
-  mediaPesata: (key: keyof VoceBiochimica) => number;
-  MAG: number;
-  salvaPasto: () => void;
-  saving: boolean;
-  message: { type: 'ok' | 'err'; text: string } | null;
-}) {
-  return (
-    <div className="space-y-6">
-      <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
-        <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
-          Cerca ingredienti
-        </h2>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Nome ingrediente..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && cercaIngredienti()}
-            className="flex-1 bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] placeholder-zinc-500 focus:border-[#dc2626] focus:ring-1 focus:ring-[#dc2626] outline-none"
-          />
-          <button
-            type="button"
-            onClick={cercaIngredienti}
-            disabled={searching}
-            className="bg-[#dc2626] hover:bg-red-700 text-white font-semibold px-4 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {searching ? '...' : 'Cerca'}
-          </button>
-        </div>
-
-        {message && (
-          <p className={`mt-3 text-sm ${message.type === 'ok' ? 'text-emerald-400' : 'text-[#dc2626]'}`}>
-            {message.text}
-          </p>
-        )}
-
-        {risultati.length > 0 && (
-          <ul className="mt-4 space-y-2 max-h-48 overflow-y-auto">
-            {risultati.map((ing) => (
-              <IngredienteRow
-                key={ing.id}
-                ing={ing}
-                onAggiungi={(grammi) => aggiungiAlPiatto(ing, grammi)}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
-        <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
-          Piatto Corrente
-        </h2>
-
-        <input
-          type="text"
-          placeholder="Descrizione pasto (es. Pranzo)"
-          value={descrizionePasto}
-          onChange={(e) => setDescrizionePasto(e.target.value)}
-          className="w-full mb-4 bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] placeholder-zinc-500 focus:border-[#dc2626] outline-none"
-        />
-
-        {piatto.length === 0 ? (
-          <p className="text-zinc-500 text-sm">Aggiungi ingredienti dalla ricerca sopra.</p>
-        ) : (
-          <>
-            <ul className="space-y-2 mb-4">
-              {piatto.map((v) => (
-                <li
-                  key={v.id}
-                  className="flex items-center justify-between gap-2 py-2 border-b border-zinc-800 last:border-0"
-                >
-                  <span className="text-[#fafafa]">{v.nome}</span>
-                  <span className="text-zinc-500 text-sm">{v.grammi} g</span>
-                  <span className="text-zinc-500 text-xs">
-                    P {v.proteine.toFixed(1)} C {v.carboidrati.toFixed(1)} G {v.grassi.toFixed(1)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => rimuoviDaPiatto(v.id)}
-                    className="text-[#dc2626] hover:underline text-sm"
-                  >
-                    Rimuovi
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="flex flex-wrap gap-4 py-3 border-t border-zinc-800 text-[#dc2626] font-mono text-sm">
-              <span>Totale P: {totali.proteine.toFixed(1)} g</span>
-              <span>Totale C: {totali.carboidrati.toFixed(1)} g</span>
-              <span>Totale G: {totali.grassi.toFixed(1)} g</span>
-            </div>
-            <button
-              type="button"
-              onClick={salvaPasto}
-              disabled={saving}
-              className="w-full mt-4 bg-[#dc2626] hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50"
-            >
-              {saving ? 'Salvataggio...' : 'Registra pasto'}
-            </button>
-          </>
-        )}
-      </section>
-
-      <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
-        <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
-          Analisi Fatigue Predictor & Glycogen Burn Rate
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-          <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-4">
-            <p className="text-zinc-500 mb-1">Fatigue</p>
-            <p className="text-[#dc2626] font-mono">{piatto.length ? calcolaFatigue({ proteine_g: totali.proteine, carboidrati_g: totali.carboidrati, grassi_g: totali.grassi }) : '—'}</p>
-          </div>
-          <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-4">
-            <p className="text-zinc-500 mb-1">Glycogen</p>
-            <p className="text-[#dc2626] font-mono">{piatto.length ? calcolaGlycogen({ carboidrati_g: totali.carboidrati }) : '—'}</p>
-          </div>
-          <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-4">
-            <p className="text-zinc-500 mb-1">MAG</p>
-            <p className="text-[#dc2626] font-mono">{piatto.length ? MAG : '—'}</p>
-          </div>
-          <div className="bg-[#09090b] border border-zinc-800 rounded-lg p-4 sm:col-span-2">
-            <p className="text-zinc-500 mb-1">T° / Freschezza / Croccantezza</p>
-            <p className="text-zinc-400 font-mono text-xs">
-              {piatto.length ? `${mediaPesata('temperatura_servizio_ideale')} / ${mediaPesata('freschezza_balsamica')} / ${mediaPesata('croccantezza_suono')}` : '—'}
-            </p>
-          </div>
-        </div>
-        <p className="mt-4 text-zinc-500 text-xs">I risultati completi vengono salvati in storico_pasti (dati_biochimici).</p>
-      </section>
-    </div>
   );
 }
 
@@ -793,7 +609,7 @@ function TabScanDetector() {
             return (
               <div key={`res-${i}`} className="bg-[#09090b] border border-zinc-800 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-zinc-500 mb-2">{r.alimento}</h3>
-                <p className="text-[#fafafa]"><span className="text-zinc-500">Vettore (d,s,a,b,u):</span> ({r.d.toFixed(2)}, {r.s.toFixed(2)}, {r.a.toFixed(2)}, {r.b.toFixed(2)}, {r.u.toFixed(2)}) · M = {det.M.toFixed(2)} · S = {r.soddisfazione.toFixed(2)}</p>
+                <p className="text-[#fafafa]"><span className="text-zinc-500">Sapori:</span> dolce {r.d.toFixed(1)}, salato {r.s.toFixed(1)}, acido {r.a.toFixed(1)}, amaro {r.b.toFixed(1)}, umami {r.u.toFixed(1)} · <span className="text-zinc-500">Magnitudo M</span> = {det.M.toFixed(2)} · <span className="text-zinc-500">Soddisfazione S</span> = {r.soddisfazione.toFixed(0)}/100</p>
                 <div className="mt-3 pt-3 border-t border-zinc-800 text-xs text-zinc-400 space-y-2">
                   <p className="font-medium text-zinc-500">Analisi</p>
                   <p>{analisi.profilo}</p>
@@ -1094,24 +910,8 @@ function TabCostaIndex() {
   };
 
   const focusedItem = items.length > 0 && focusedIndex >= 0 && focusedIndex < items.length ? items[focusedIndex]! : items[0] ?? null;
-  let costaIndex = 0;
-  if (focusedItem) {
-    const { d = 0, s = 0, a = 0, b = 0, u = 0, temp = 20, melting = 0, k = 0.3, magnitudo: magnitudoItem = 0 } = focusedItem;
-    const magnitudo = magnitudoItem > 0 ? magnitudoItem : Math.sqrt(d * d + s * s + a * a + b * b + u * u);
-
-    // NUMERATORE: Ebbrezza Neurale (Il piacere che stordisce)
-    const Eb = (magnitudo * 1.5) + (melting * 2) + (Math.abs(37 - temp) / 10);
-
-    // DENOMINATORE: Il Conto Metabolico (Quanto ti costa)
-    const R_gly = Math.max(0, d - (b * 2)) / 2;    // Attrito Glicemico
-    const R_hep = (u * s * melting) / 40;          // Carico Fegato/Food Coma
-    const R_dop = Math.max(0, magnitudo - 5) * k;   // Debito di Sazietà (Loop Edonico)
-
-    const Conto = 1.0 + R_gly + R_hep + R_dop;
-
-    // Index finale normalizzato (moltiplicato per 8 per scala 0-100)
-    costaIndex = Math.round(Math.max(0, Math.min(100, (Eb / Conto) * 8)));
-  }
+  const costaEsito = computeCostaIndex(focusedItem);
+  const costaIndex = costaEsito?.costaIndex ?? 0;
   const gaugeColor = costaIndex < 50 ? '#ef4444' : costaIndex < 75 ? '#eab308' : '#22c55e';
 
   const removeItem = async (index: number) => {
@@ -1296,8 +1096,15 @@ function TabCostaIndex() {
 }
 
 
-function TabScanRicette() {
+type RigaIngrediente = { ingrediente: string; grammi: number; cottura: string };
+
+const RIGHE_INIZIALI_OTTIMIZZATORE = 5;
+
+function TabOttimizzatoreRicette() {
   const [ricetta, setRicetta] = useState('');
+  const [righe, setRighe] = useState<RigaIngrediente[]>(() =>
+    Array.from({ length: RIGHE_INIZIALI_OTTIMIZZATORE }, () => ({ ingrediente: '', grammi: 0, cottura: '' }))
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<ScanResult[]>([]);
   const [piattoResult, setPiattoResult] = useState<ScanResult | null>(null);
@@ -1316,7 +1123,8 @@ function TabScanRicette() {
   const [ricetteGenerate, setRicetteGenerate] = useState<Record<number, string[]>>({});
   const [generaLoading, setGeneraLoading] = useState<number | null>(null);
 
-  /** Tutte le opzioni vengono mostrate; quelle con S >= piatto originale sono "consigliate". */
+  /** Mostriamo tutte le opzioni; segnaliamo quando il miglioramento è insufficiente (S < 15 o S non migliora). */
+  const SOGLIA_SODDISFAZIONE_MIN = 15;
   const allOptionIndices = useMemo((): number[] => {
     return piattoCorrettoResults.map((_, i: number) => i);
   }, [piattoCorrettoResults.length]);
@@ -1443,10 +1251,18 @@ function TabScanRicette() {
     return () => ro.disconnect();
   }, []);
 
+  const buildRicettaFromRighe = useCallback(() => {
+    return righe
+      .filter((r) => r.ingrediente.trim())
+      .map((r) => `${r.grammi || 0}g ${r.ingrediente.trim()}${r.cottura ? ` ${r.cottura}` : ''}`)
+      .join(', ');
+  }, [righe]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = ricetta.trim();
+    const trimmed = buildRicettaFromRighe();
     if (!trimmed) return;
+    setRicetta(trimmed);
     setIsLoading(true);
     setError(null);
     try {
@@ -1510,20 +1326,76 @@ function TabScanRicette() {
     }
   };
 
+  const updateRiga = useCallback((index: number, field: keyof RigaIngrediente, value: string | number) => {
+    setRighe((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index]!, [field]: value };
+      return next;
+    });
+  }, []);
+  const aggiungiRiga = useCallback(() => setRighe((prev) => [...prev, { ingrediente: '', grammi: 0, cottura: '' }]), []);
+  const rimuoviRiga = useCallback((index: number) => {
+    setRighe((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   return (
     <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
       <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
-        Scan Ricette
+        Ottimizzatore Ricette
       </h2>
       <form onSubmit={handleSubmit} className="flex flex-col gap-2 mb-6">
-        <textarea
-          placeholder="Incolla la ricetta o elenca gli ingredienti..."
-          value={ricetta}
-          onChange={(e) => setRicetta(e.target.value)}
-          disabled={isLoading}
-          rows={4}
-          className="w-full bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] placeholder-zinc-500 focus:border-[#dc2626] outline-none disabled:opacity-60 resize-y"
-        />
+        <div className="space-y-3">
+          <p className="text-zinc-500 text-sm mb-3">Inserisci ingrediente, quantità in grammi e tipo di cottura. Poi clicca Analizza.</p>
+          {righe.map((riga, i) => (
+            <div key={i} className="flex flex-wrap items-center gap-2 p-3 bg-[#09090b] border border-zinc-800 rounded-lg">
+              <input
+                type="text"
+                placeholder="Ingrediente"
+                value={riga.ingrediente}
+                onChange={(e) => updateRiga(i, 'ingrediente', e.target.value)}
+                disabled={isLoading}
+                className="flex-1 min-w-[120px] bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-[#fafafa] placeholder-zinc-500 focus:border-[#dc2626] outline-none"
+              />
+              <input
+                type="number"
+                placeholder="g"
+                min={0}
+                value={riga.grammi || ''}
+                onChange={(e) => updateRiga(i, 'grammi', e.target.value === '' ? 0 : Number(e.target.value))}
+                disabled={isLoading}
+                className="w-20 bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-[#fafafa] placeholder-zinc-500 focus:border-[#dc2626] outline-none"
+              />
+              <span className="text-zinc-500 text-sm">g</span>
+              <select
+                value={riga.cottura}
+                onChange={(e) => updateRiga(i, 'cottura', e.target.value)}
+                disabled={isLoading}
+                className="bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-[#fafafa] focus:border-[#dc2626] outline-none min-w-[140px]"
+              >
+                {COTTURA_LABELS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              {righe.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => rimuoviRiga(i)}
+                  className="text-zinc-500 hover:text-red-400 p-1"
+                  aria-label="Rimuovi riga"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={aggiungiRiga}
+            className="flex items-center gap-1 text-sm text-[#dc2626] hover:underline"
+          >
+            + Aggiungi altro ingrediente
+          </button>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button
             type="submit"
@@ -1534,13 +1406,32 @@ function TabScanRicette() {
           </button>
           <button
             type="button"
-            onClick={() => { setResults([]); setPiattoResult(null); setOpzioniCorrezione([]); setSuggerimentiCotture([]); setPiattoCorrettoResults([]); setRicetteGenerate({}); setGeneraLoading(null); setSelectedGraphIndex(0); }}
+            onClick={() => {
+              setResults([]);
+              setPiattoResult(null);
+              setOpzioniCorrezione([]);
+              setSuggerimentiCotture([]);
+              setPiattoCorrettoResults([]);
+              setRicetteGenerate({});
+              setGeneraLoading(null);
+              setSelectedGraphIndex(0);
+              setRicetta('');
+              setRighe(Array.from({ length: RIGHE_INIZIALI_OTTIMIZZATORE }, () => ({ ingrediente: '', grammi: 0, cottura: '' })));
+            }}
             className="bg-zinc-700 hover:bg-zinc-600 text-white font-medium px-3 py-2 rounded-lg transition-colors text-sm"
           >
             Pulisci
           </button>
         </div>
       </form>
+      {isLoading && (
+        <div className="mb-4 rounded-lg overflow-hidden bg-zinc-800/80 border border-zinc-700">
+          <div className="h-2 bg-zinc-900 overflow-hidden">
+            <div className="h-full w-[40%] bg-[#dc2626] rounded-full loading-bar-indeterminate" />
+          </div>
+          <p className="text-xs text-zinc-400 px-3 py-2">Analisi ricetta in corso…</p>
+        </div>
+      )}
       {error && <p className="text-[#dc2626] text-sm mb-4">{error}</p>}
       {results.length > 0 && (
         <div className="space-y-4 mb-6">
@@ -1596,13 +1487,18 @@ function TabScanRicette() {
                 {(() => {
                   const ef = getEffectiveProfile(r);
                   const hasCottura = (r.cottura ?? '') !== '';
+                  const M = Math.sqrt(ef.d*ef.d+ef.s*ef.s+ef.a*ef.a+ef.b*ef.b+ef.u*ef.u);
                   return (
-                    <p className="text-[#fafafa]">
-                      <span className="text-zinc-500">Vettore (d,s,a,b,u):</span>{' '}
-                      ({ef.d.toFixed(2)}, {ef.s.toFixed(2)}, {ef.a.toFixed(2)}, {ef.b.toFixed(2)}, {ef.u.toFixed(2)})
-                      {hasCottura && <span className="text-zinc-500 text-xs ml-1">con cottura</span>}
-                      {' · M effettivo = '}{Math.sqrt(ef.d*ef.d+ef.s*ef.s+ef.a*ef.a+ef.b*ef.b+ef.u*ef.u).toFixed(2)}
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-[#fafafa]">
+                        <span className="text-zinc-500">Sapori (0–5):</span> dolce {ef.d.toFixed(1)}, salato {ef.s.toFixed(1)}, acido {ef.a.toFixed(1)}, amaro {ef.b.toFixed(1)}, umami {ef.u.toFixed(1)}
+                        {hasCottura && <span className="text-zinc-500 text-xs ml-1">· con cottura</span>}
+                      </p>
+                      <p className="text-[#fafafa]">
+                        <span className="text-zinc-500">Magnitudo M</span> (intensità complessiva) = {M.toFixed(2)} · <span className="text-zinc-500">Soddisfazione S</span> (0–100) = {r.soddisfazione.toFixed(0)}
+                      </p>
+                      <p className="text-xs text-zinc-500">Ideale: M vicino a 7,5 e S alto. M troppo bassa = piatto poco “carico”; M troppo alta = rischio saturazione.</p>
+                    </div>
                   );
                 })()}
                 <div className="mt-3 pt-3 border-t border-zinc-800 text-xs text-zinc-400 space-y-2">
@@ -1623,10 +1519,10 @@ function TabScanRicette() {
           })}
         </div>
       )}
-      {allOptionIndices.length > 0 && (
+      {(allOptionIndices.length > 0 || opzioniCorrezione.length > 0) && (
         <div className="mb-6 space-y-3">
-          <h3 className="text-sm font-semibold text-[#fafafa]">Aggiunta di ingredienti per bilanciare il piatto</h3>
-          <p className="text-xs text-zinc-400">Scegli un&apos;opzione: ingredienti da <strong>aggiungere</strong> alla ricetta. Clicca sulla card per vedere il risultato sul grafico. Le opzioni che migliorano la soddisfazione (S) sono evidenziate.</p>
+          <h3 className="text-sm font-semibold text-[#fafafa]">Correzioni per bilanciare il piatto</h3>
+          <p className="text-xs text-zinc-400">Scegli un&apos;opzione (sostituzioni e/o aggiunte). Clicca sulla card per vedere il risultato sul grafico. Delta = differenza rispetto al piatto originale. Ideale: M ≈ 7,5, S alta.</p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {allOptionIndices.map((opzioneIndex, displayIdx) => {
               const op = opzioniCorrezione[opzioneIndex];
@@ -1644,16 +1540,58 @@ function TabScanRicette() {
                 >
                   <p className="font-medium text-emerald-200">{op.nome}</p>
                   <p className="text-xs text-zinc-400 mt-1">{op.descrizione}</p>
-                  <p className="text-xs text-zinc-500 mt-2">Aggiungi alla ricetta:</p>
-                  <ul className="text-xs text-zinc-300 list-disc list-inside">
-                    {op.correttivi.map((c, i) => (
-                      <li key={i}>{c.nome} {c.grammi > 0 && `(${c.grammi} g)`}</li>
-                    ))}
-                  </ul>
-                  {corretto && (
+                  {(op.modifiche_grammi?.length ?? 0) > 0 && (
+                    <>
+                      <p className="text-xs text-zinc-500 mt-2">Modifica quantità:</p>
+                      <ul className="text-xs text-zinc-300 list-disc list-inside">
+                        {op.modifiche_grammi!.map((m, i) => {
+                          const orig = results.find((r) => r.alimento.trim().toLowerCase() === m.nome.trim().toLowerCase());
+                          const origG = orig?.grammi ?? 0;
+                          return <li key={i}>{m.nome}: {origG} g → {m.grammi} g</li>;
+                        })}
+                      </ul>
+                    </>
+                  )}
+                  {(op.sostituzioni?.length ?? 0) > 0 && (
+                    <>
+                      <p className="text-xs text-zinc-500 mt-2">Sostituisci:</p>
+                      <ul className="text-xs text-zinc-300 list-disc list-inside">
+                        {op.sostituzioni!.map((s, i) => (
+                          <li key={i}>{s.da} → {s.nome} {s.grammi > 0 && `(${s.grammi} g)`}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  {(op.correttivi?.length ?? 0) > 0 && (
+                    <>
+                      <p className="text-xs text-zinc-500 mt-2">Aggiungi:</p>
+                      <ul className="text-xs text-zinc-300 list-disc list-inside">
+                        {op.correttivi!.map((c, i) => (
+                          <li key={i}>{c.nome} {c.grammi > 0 && `(${c.grammi} g)`}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  {corretto && piattoResult && (
+                    <>
+                      <p className="text-xs mt-2 text-emerald-300">
+                        Risultato: <strong>Magnitudo M</strong> = {corretto.magnitudo.toFixed(2)} · <strong>Soddisfazione S</strong> = {corretto.soddisfazione.toFixed(0)}/100
+                        {miglioraS && <span className="ml-1 text-emerald-400 font-medium">↑ migliora S</span>}
+                      </p>
+                      <p className="text-xs mt-1 text-zinc-400">
+                        Delta vs originale: <strong className={corretto.magnitudo >= (piattoResult.magnitudo ?? 0) ? 'text-emerald-400' : 'text-red-400'}>ΔM = {(corretto.magnitudo - (piattoResult.magnitudo ?? 0)) >= 0 ? '+' : ''}{(corretto.magnitudo - (piattoResult.magnitudo ?? 0)).toFixed(2)}</strong>
+                        {' · '}
+                        <strong className={corretto.soddisfazione >= (piattoResult.soddisfazione ?? 0) ? 'text-emerald-400' : 'text-red-400'}>ΔS = {(corretto.soddisfazione - (piattoResult.soddisfazione ?? 0)) >= 0 ? '+' : ''}{(corretto.soddisfazione - (piattoResult.soddisfazione ?? 0)).toFixed(0)}</strong>
+                      </p>
+                      {(corretto.soddisfazione < SOGLIA_SODDISFAZIONE_MIN || !miglioraS) && (
+                        <span className="block text-amber-400/90 text-xs mt-0.5">Miglioramento insufficiente (S &lt; {SOGLIA_SODDISFAZIONE_MIN} o S non aumenta).</span>
+                      )}
+                      <span className="block text-zinc-500 text-xs mt-0.5">Ideale: M ≈ 7,5, S alto.</span>
+                    </>
+                  )}
+                  {corretto && !piattoResult && (
                     <p className="text-xs mt-2 text-emerald-300">
-                      Risultato: M = {corretto.magnitudo.toFixed(2)} · S = {corretto.soddisfazione.toFixed(2)}
-                      {miglioraS && <span className="ml-1 text-emerald-400 font-medium">↑ migliora S</span>}
+                      Risultato: <strong>M</strong> = {corretto.magnitudo.toFixed(2)} · <strong>S</strong> = {corretto.soddisfazione.toFixed(0)}/100
                     </p>
                   )}
                 </div>
@@ -1703,84 +1641,6 @@ function TabScanRicette() {
           </ul>
         </div>
       )}
-      {selectedGraphIndex >= 1 && allOptionIndices[selectedGraphIndex - 1] !== undefined && (() => {
-        const opzioneIndex = allOptionIndices[selectedGraphIndex - 1];
-        const op = opzioniCorrezione[opzioneIndex];
-        if (!op) return null;
-        const passaggi = ricetteGenerate[opzioneIndex] ?? [];
-        const loading = generaLoading === opzioneIndex;
-        return (
-          <div className="mb-6 p-5 rounded-xl border border-emerald-700/50 bg-emerald-950/20 space-y-4">
-            <h3 className="text-base font-semibold text-emerald-200">
-              Ricetta dettagliata — {op.nome}
-            </h3>
-            <div>
-              <h4 className="text-sm font-medium text-emerald-300 mb-2">Ingredienti e grammature</h4>
-              <ul className="space-y-1 text-sm">
-                {results.map((r, i) => (
-                  <li key={i} className="text-[#fafafa]">
-                    {r.alimento}: <span className="text-emerald-300 tabular-nums">{r.grammi ?? 0} g</span>
-                  </li>
-                ))}
-                {op.correttivi.map((c, i) => (
-                  <li key={`c-${i}`} className="text-[#fafafa]">
-                    <span className="text-emerald-400">+ {c.nome}:</span> <span className="text-emerald-300 tabular-nums">{c.grammi} g</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs text-zinc-400 mt-2">
-                Totale: <span className="tabular-nums font-medium text-zinc-300">
-                  {results.reduce((a, r) => a + (r.grammi ?? 0), 0) + op.correttivi.reduce((a, c) => a + c.grammi, 0)} g
-                </span>
-              </p>
-            </div>
-            {passaggi.length > 0 ? (
-              <div>
-                <h4 className="text-sm font-medium text-emerald-300 mb-2">Procedura</h4>
-                <ol className="list-decimal list-inside space-y-2 text-sm text-zinc-200 leading-relaxed">
-                  {passaggi.map((step, i) => (
-                    <li key={i} className="pl-1">{step}</li>
-                  ))}
-                </ol>
-              </div>
-            ) : (
-              <div>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={async () => {
-                    setGeneraLoading(opzioneIndex);
-                    try {
-                      const res = await fetch('/api/scan-ricetta-genera', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          ricetta: ricetta.trim(),
-                          nome_opzione: op.nome,
-                          ingredienti: results.map((r) => ({ nome: r.alimento, grammi: r.grammi ?? 0 })),
-                          correttivi: op.correttivi.map((c) => ({ nome: c.nome, grammi: c.grammi })),
-                        }),
-                      });
-                      const data = await res.json().catch(() => ({}));
-                      if (!res.ok) throw new Error((data as { error?: string }).error || `Errore ${res.status}`);
-                      const list = (data as { passaggi?: string[] }).passaggi ?? [];
-                      setRicetteGenerate((prev) => ({ ...prev, [opzioneIndex]: list }));
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : 'Errore generazione ricetta');
-                    } finally {
-                      setGeneraLoading(null);
-                    }
-                  }}
-                  className="rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed px-4 py-2 text-sm font-medium text-white"
-                >
-                  {loading ? 'Generazione in corso…' : 'Genera ricetta'}
-                </button>
-                <p className="text-xs text-zinc-500 mt-2 italic">Ricetta molto dettagliata con pesi, tempi di cottura e temperature (generata on demand).</p>
-              </div>
-            )}
-          </div>
-        );
-      })()}
       <div className="mt-8 flex flex-col lg:flex-row gap-6">
         <div className="flex-1 min-w-0" style={{ paddingLeft: 28, paddingBottom: 28 }}>
           <div className="flex items-center justify-between gap-2 mb-2">
@@ -1815,6 +1675,25 @@ function TabScanRicette() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 mb-1">Trascina il grafico per spostarlo (click su area vuota e trascina).</p>
+          {graphPoints.length > 0 && (
+            <div
+              className={`mb-3 px-4 py-2 rounded-lg flex items-center gap-2 border ${
+                selectedGraphIndex >= 1
+                  ? 'bg-emerald-950/40 border-emerald-600 text-emerald-100'
+                  : 'bg-zinc-800/90 border-zinc-600'
+              }`}
+            >
+              <span className="text-sm font-medium shrink-0">
+                {selectedGraphIndex >= 1 ? 'Hai selezionato: correzione per bilanciare il piatto — ' : 'Stai guardando: '}
+              </span>
+              <span className="font-semibold truncate text-[#fafafa]" title={graphPoints[selectedGraphIndex]?.alimento ?? ''}>
+                {graphPoints[selectedGraphIndex]?.alimento ?? '—'}
+              </span>
+              <span className="text-zinc-500 text-xs shrink-0">
+                {selectedGraphIndex === 0 ? '(ricetta base)' : '(pallino verde = correzione selezionata)'}
+              </span>
+            </div>
+          )}
           <div className="rounded-xl border border-zinc-700" style={{ height: 260, overflow: 'hidden', position: 'relative' }}>
             <div
               role="presentation"
@@ -1839,6 +1718,7 @@ function TabScanRicette() {
               const isOriginal = i === 0;
               const isSelected = selectedGraphIndex === i;
               const color = isOriginal ? '#3b82f6' : '#22c55e';
+              const selectedColor = isOriginal ? '#f97316' : '#10b981';
               return (
                 <button
                   type="button"
@@ -1852,9 +1732,9 @@ function TabScanRicette() {
                     style={{
                       width: 16,
                       height: 16,
-                      backgroundColor: isSelected ? '#f97316' : color,
+                      backgroundColor: isSelected ? selectedColor : color,
                       borderRadius: '50%',
-                      boxShadow: inRedZone ? undefined : (isSelected ? '0 0 14px #f97316' : `0 0 12px ${color}80`),
+                      boxShadow: inRedZone ? undefined : (isSelected ? `0 0 14px ${selectedColor}` : `0 0 12px ${color}80`),
                     }}
                   />
                   <span style={{ position: 'absolute', left: '50%', bottom: '100%', transform: 'translateX(-50%)', marginBottom: 4, fontSize: 11, fontWeight: 700, color: '#ffffff', textShadow: '0 0 4px #000, 0 1px 2px #000', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
@@ -1902,6 +1782,94 @@ function TabScanRicette() {
           distanzaMolecolare={null}
         />
       )}
+      {selectedGraphIndex >= 1 && allOptionIndices[selectedGraphIndex - 1] !== undefined && (() => {
+        const opzioneIndex = allOptionIndices[selectedGraphIndex - 1];
+        const op = opzioniCorrezione[opzioneIndex];
+        if (!op) return null;
+        const passaggi = ricetteGenerate[opzioneIndex] ?? [];
+        const loading = generaLoading === opzioneIndex;
+        const getGrammiEffettivi = (r: ScanResult) => {
+          const mod = op.modifiche_grammi?.find((m) => m.nome.trim().toLowerCase() === r.alimento.trim().toLowerCase());
+          return mod != null ? mod.grammi : (r.grammi ?? 0);
+        };
+        const ingredientiEffettivi = results.map((r) => ({ nome: r.alimento, grammi: getGrammiEffettivi(r) }));
+        const totaleG = ingredientiEffettivi.reduce((a, x) => a + x.grammi, 0) + op.correttivi.reduce((a, c) => a + c.grammi, 0);
+        return (
+          <div className="mt-8 p-5 rounded-xl border border-emerald-700/50 bg-emerald-950/20 space-y-4">
+            <h3 className="text-base font-semibold text-emerald-200">
+              Ricetta dettagliata — {op.nome}
+            </h3>
+            <div>
+              <h4 className="text-sm font-medium text-emerald-300 mb-2">Ingredienti e grammature</h4>
+              <ul className="space-y-1 text-sm">
+                {ingredientiEffettivi.map((x, i) => {
+                  const origResult = results.find((r) => r.alimento.trim().toLowerCase() === x.nome.trim().toLowerCase());
+                  const orig = origResult?.grammi ?? 0;
+                  const modificato = op.modifiche_grammi?.some((m) => m.nome.trim().toLowerCase() === x.nome.trim().toLowerCase());
+                  return (
+                    <li key={i} className="text-[#fafafa]">
+                      {x.nome}: <span className="text-emerald-300 tabular-nums">{x.grammi} g</span>
+                      {modificato && orig !== x.grammi && <span className="text-zinc-500 text-xs ml-1">(era {orig} g)</span>}
+                    </li>
+                  );
+                })}
+                {op.correttivi.map((c, i) => (
+                  <li key={`c-${i}`} className="text-[#fafafa]">
+                    <span className="text-emerald-400">+ {c.nome}:</span> <span className="text-emerald-300 tabular-nums">{c.grammi} g</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-zinc-400 mt-2">
+                Totale: <span className="tabular-nums font-medium text-zinc-300">{totaleG} g</span>
+              </p>
+            </div>
+            {passaggi.length > 0 ? (
+              <div>
+                <h4 className="text-sm font-medium text-emerald-300 mb-2">Procedura</h4>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-zinc-200 leading-relaxed">
+                  {passaggi.map((step, i) => (
+                    <li key={i} className="pl-1">{step}</li>
+                  ))}
+                </ol>
+              </div>
+            ) : (
+              <div>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={async () => {
+                    setGeneraLoading(opzioneIndex);
+                    try {
+                      const res = await fetch('/api/scan-ricetta-genera', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          ricetta: ricetta.trim(),
+                          nome_opzione: op.nome,
+                          ingredienti: ingredientiEffettivi,
+                          correttivi: op.correttivi.map((c) => ({ nome: c.nome, grammi: c.grammi })),
+                        }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) throw new Error((data as { error?: string }).error || `Errore ${res.status}`);
+                      const list = (data as { passaggi?: string[] }).passaggi ?? [];
+                      setRicetteGenerate((prev) => ({ ...prev, [opzioneIndex]: list }));
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : 'Errore generazione ricetta');
+                    } finally {
+                      setGeneraLoading(null);
+                    }
+                  }}
+                  className="rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed px-4 py-2 text-sm font-medium text-white"
+                >
+                  {loading ? 'Generazione in corso…' : 'Genera ricetta'}
+                </button>
+                <p className="text-xs text-zinc-500 mt-2 italic">Ricetta molto dettagliata con pesi, tempi di cottura e temperature (generata on demand).</p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </section>
   );
 }

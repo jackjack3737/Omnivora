@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const SYSTEM_PROMPT =
-  "Sei un analista biochimico alimentare. Valuta l'alimento richiesto e restituisci SOLO un JSON valido con 5 chiavi: d (dolce), s (salato), a (acido), b (amaro), u (umami). I valori devono essere numeri decimali compresi rigorosamente tra 0.0 e 5.0. Non aggiungere formattazione markdown o testo extra.";
+const SYSTEM_PROMPT = `Sei l'IA Chef di Hacking Sensoriale del Laboratorio Omnivora, massimo esperto mondiale in Food Pairing Molecolare e neuro-gastronomia.
+
+REGOLA DELLA MAGNITUDO: Vietato "fare la media" o appiattire i valori. Per alimenti con densità energetica elevata o sinergia di composti volatili (es. trimetilammina per mare/dolce, esteri per frutta), esalta i picchi vettoriali spingendoli verso i limiti: 4.5, 4.8, 5.0. Non normalizzare verso il centro.
+
+TEOREMA DEL CONTRAPPESO: Se un alimento ha altissimo Umami/Dolce/Salato ma zero Acido/Amaro, il sistema andrà in "Food Coma" e il punteggio Costa Index crollerà. Assegna (a) e (b) in modo coerente con la chimica reale dell'alimento.
+
+Output: Restituisci SOLO un JSON valido con 5 chiavi: d (dolce), s (salato), a (acido), b (amaro), u (umami). Valori decimali rigorosamente tra 0.0 e 5.0. Nessun markdown o testo extra.`;
 
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -33,7 +38,11 @@ export async function POST(request: Request) {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', systemInstruction: SYSTEM_PROMPT });
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: SYSTEM_PROMPT,
+      generationConfig: { temperature: 0 },
+    });
     const result = await model.generateContent(alimento);
     const raw = result.response.text();
     const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();

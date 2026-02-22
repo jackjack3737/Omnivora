@@ -36,34 +36,34 @@ export function LaboratoryReport01({
       </div>
       <div className="p-4 text-xs text-zinc-300 space-y-4">
         <div className="flex flex-wrap gap-3">
-          <div className="inline-flex items-center gap-2 rounded border border-zinc-700 bg-zinc-900/80 px-3 py-1.5">
-            <span className="text-zinc-500">S_y</span>
-            <span className="text-[#eab308] tabular-nums">{result.soddisfazione.toFixed(2)}</span>
+          <div className="inline-flex items-center gap-2 rounded border border-zinc-700 bg-zinc-900/80 px-3 py-1.5" title="Soddisfazione finale (0–100): quanto il laboratorio valuta il campione">
+            <span className="text-zinc-500">Soddisfazione S</span>
+            <span className="text-[#eab308] tabular-nums">{result.soddisfazione.toFixed(0)}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded border border-zinc-700 bg-zinc-900/80 px-3 py-1.5" title="Magnitudo: intensità complessiva dei sapori (ideale ≈ 7,5)">
+            <span className="text-zinc-500">Magnitudo M</span>
+            <span className="text-[#eab308] tabular-nums">{det.M.toFixed(2)}</span>
           </div>
           {distanzaMolecolare !== null && (
-            <div className="inline-flex items-center gap-2 rounded border border-zinc-700 bg-zinc-900/80 px-3 py-1.5">
-              <span className="text-zinc-500">D</span>
+            <div className="inline-flex items-center gap-2 rounded border border-zinc-700 bg-zinc-900/80 px-3 py-1.5" title="Distanza tra i profili (d,s,a,b,u) di due campioni">
+              <span className="text-zinc-500">Distanza D</span>
               <span className="text-[#eab308] tabular-nums">{distanzaMolecolare.toFixed(4)}</span>
             </div>
           )}
-          <div className="inline-flex items-center gap-2 rounded border border-zinc-700 bg-zinc-900/80 px-3 py-1.5">
-            <span className="text-zinc-500">P(t) k</span>
+          <div className="inline-flex items-center gap-2 rounded border border-zinc-700 bg-zinc-900/80 px-3 py-1.5" title="Decadimento del sapore nel tempo (k alto = cala in fretta)">
+            <span className="text-zinc-500">Decadimento k</span>
             <span className="text-[#eab308] tabular-nums">{(result.k ?? 0.3).toFixed(2)}</span>
           </div>
-          <div className="inline-flex items-center gap-2 rounded border border-zinc-700 bg-zinc-900/80 px-3 py-1.5">
-            <span className="text-zinc-500">S_base</span>
+          <div className="inline-flex items-center gap-2 rounded border border-zinc-700 bg-zinc-900/80 px-3 py-1.5" title="Soddisfazione base prima di penalità/bonus">
+            <span className="text-zinc-500">S base</span>
             <span className="text-[#eab308] tabular-nums">{det.S_base.toFixed(2)}</span>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded border border-zinc-700 bg-zinc-900/80 px-3 py-1.5">
-            <span className="text-zinc-500">M</span>
-            <span className="text-[#eab308] tabular-nums">{det.M.toFixed(2)}</span>
           </div>
         </div>
         <div className="rounded border border-zinc-700 bg-zinc-900/60 p-3 space-y-2">
-          <p className="text-zinc-500 font-semibold uppercase tracking-wider">Analisi algoritmi (Protocollo Omnivora)</p>
+          <p className="text-zinc-500 font-semibold uppercase tracking-wider">Analisi (Protocollo Omnivora)</p>
           <p className="text-zinc-200">{analisi.profilo}</p>
           <p className="text-zinc-200">{analisi.magnitudo}</p>
-          {det.contrappeso && <p className="text-amber-300">• Teorema del Contrappeso applicato (−40%): S_base × 0,6</p>}
+          {det.contrappeso && <p className="text-amber-300">• Teorema del Contrappeso applicato (−40%): S base × 0,6</p>}
           {det.bonusMelting && <p className="text-amber-300">• Bonus melting: +15 alla soddisfazione</p>}
           {det.loopEdonico && <p className="text-amber-400 font-medium">• Loop edonico rilevato (M &gt; 8, k &gt; 0,5)</p>}
           {analisi.correzioni.length > 0 && (

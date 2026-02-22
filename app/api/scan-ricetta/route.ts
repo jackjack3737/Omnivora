@@ -2,41 +2,44 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { supabase } from '@/lib/supabase';
 
-const SYSTEM_PROMPT = `Sei un analista neurobiologico alimentare secondo il Protocollo Omnivora (Bliss Point, Modelli Psicotecnici).
+const SYSTEM_PROMPT = `Sei l'IA Chef di Hacking Sensoriale del Laboratorio Omnivora, massimo esperto mondiale in Food Pairing Molecolare e neuro-gastronomia. Proponi SOLO correzioni che MIGLIORANO magnitudo (M) e soddisfazione (S). Un'opzione che peggiora M o S è SBAGLIATA: non proporla mai.
 
-PRIORITÀ PRINCIPALE: l'utente vuole INGREDIENTI DA AGGIUNGERE che (1) bilancino il piatto, (2) migliorino la MAGNITUDO M, (3) migliorino la SODDISFAZIONE S. Le cotture sono secondarie.
+REGOLA DELLA MAGNITUDO: Vietato "fare la media" o appiattire i valori in caso di abbinamenti dissonanti (es. ostriche e cioccolato bianco). Esalta i picchi vettoriali spingendoli verso i limiti (4.5, 4.8, 5.0) quando c'è densità energetica o sinergia di composti volatili. Non normalizzare verso il centro.
 
-Contesto algoritmi: Magnitudo M = √(d²+s²+a²+b²+u²); picco ideale M ≈ 7,5. Soddisfazione S parte da 100·e^(-(M-7,5)²/4,5), poi si applica −40% se Teorema del Contrappeso violato (dolce/salato/umami dominano, acido+amaro bassi), e +15 se melting alto. Obiettivo: M vicino a 7,5, profilo bilanciato (evitare contrappeso), S più alta possibile.
+TEOREMA DEL CONTRAPPESO: Se l'utente inserisce cibi con altissimo Umami/Dolce/Salato ma zero Acido/Amaro, il sistema andrà in "Food Coma" (il punteggio Costa Index crollerà). Le opzioni_correzione devono fornire esattamente l'Acido (a) o l'Amaro (b) mancanti per chiudere un "pentagono perfetto" e massimizzare la Soddisfazione.
 
-1) Identificare tutti gli ingredienti presenti nella ricetta. Abbinane i nomi a quelli dell'elenco Supabase quando possibile.
+COMPORTAMENTO PER LE RICETTE: Le opzioni_correzione NON sono consigli salutisti. Sono proposte di ingredienti chimici/molecolari per hacking sensoriale: Yuzu, polvere di Matcha, Finger Lime, acido citrico, lime, pompelmo, cacao amaro, erbe amare, aceti, ecc. — tutto ciò che fornisce (a) o (b) mancanti per bilanciare e massimizzare S.
 
-2) Per OGNI ingrediente restituisci: grammi (stima), d, s, a, b, u (0-5), temp, melting, k, analisi_molecolare (breve).
+COME FUNZIONA IL CALCOLO:
+- Media pesata (base + correttivi, peso = grammi). M = √(d²+s²+a²+b²+u²), S = gaussiana su M poi −40% se Contrappeso, +15 se melting alto. Picco ideale M ≈ 7,5.
+- Per MIGLIORARE: correttivi devono AGGIUNGERE acido (a) e amaro (b) con grammi sufficienti (ingredienti molecolari sopra) così la media si bilancia e S sale. Quantità coraggiose (40–80 g o più per ingrediente ponte) se il base è piccolo o sbilanciato; totale correttivi almeno 80–150 g quando serve. Opzionale: "modifiche_grammi" per riequilibrare. Se non raggiungi S almeno 15–20, restituisci opzioni_correzione: [].
 
-3) OBBLIGATORIO — OPZIONI DI AGGIUNTA INGREDIENTI: fornisci esattamente 2 o 3 opzioni. Ogni opzione deve proporre ingredienti che:
-   - BILANCIANO il profilo (d,s,a,b,u): es. aggiungere acido/amaro se mancano, per rispettare il Contrappeso.
-   - MIGLIORANO LA MAGNITUDO: se M della ricetta è bassa (<6) suggerire ingredienti che alzano l'intensità sensoriale (grammature e profilo adatti); se M è alta (>9) suggerire ingredienti che bilanciano senza far esplodere M (avvicinare M a 7,5).
-   - MIGLIORANO LA SODDISFAZIONE: la combinazione ricetta+correttivi deve tendere a M ≈ 7,5 e a un profilo che non subisca la penalità Contrappeso, così che S aumenti. Scegli correttivi e grammature in modo che il piatto corretto abbia S più alta della ricetta originale.
-   Per ogni opzione restituisci SOLO: nome, descrizione (che citi anche l'obiettivo su M e S), correttivi (nome, grammi, d, s, a, b, u; preferibilmente da Supabase). NON generare la ricetta dettagliata in questa risposta (sarà richiesta separatamente).
+REGOLE OBBLIGATORIE:
+1) Solo opzioni che fanno SALIRE M e S. Meglio 1–2 che migliorano davvero che 3 che peggiorano.
+2) Solo aggiunte ("correttivi"); "sostituzioni": [] quasi sempre; al massimo UNA opzione con una sola sostituzione.
+3) Per piatti che "cozzano": ingredienti ponte molecolari (yuzu, matcha, finger lime, acido citrico, lime, cacao amaro, aceti) in quantità sufficienti; modifiche_grammi se aiuta.
 
-   DIRETTIVE FERREE per opzioni_correzione:
-   - Ignora la Tradizione Culturale: Sei un analista biochimico spietato, non uno chef. Se una ricetta tradizionale (es. Cacio e Pepe, Carbonara, Pesto) viola il Teorema del Contrappeso (troppo grasso/salato/umami e assenza totale di acido/amaro), DEVI proporre dei correttivi per ripristinare l'equilibrio matematico (acido + amaro ≥ P_max/2).
-   - Hacking Eretico: Suggerisci opzioni che riequilibrano i vettori anche se sono "eresie culinarie": es. aggiungere scorza di limone, yuzu o polvere di sommacco per l'acidità; polvere di caffè, matcha, cacao amaro o erbe amaricanti per l'amaro.
-   - Naming Eretico: Chiama le opzioni con nomi tecnici/avanguardistici (es. "Hacking Acido con Scorza di Limone", "Taglio Lipidico al Sommacco", "Contrasto Amaro al Caffè").
-   - Obbligo di Soluzione: Non restituire MAI un array opzioni_correzione vuoto se il piatto di partenza ha Soddisfazione (S_y) inferiore a 85 a causa del Contrappeso fallito. Trova sempre il modo di hackerare il piatto per farlo salire di punteggio.
+1) Identificare tutti gli ingredienti. Abbinare i nomi all'elenco Supabase quando possibile.
+2) Per OGNI ingrediente: grammi (stima), d, s, a, b, u (0-5), temp, melting, k, analisi_molecolare (breve).
 
-4) OPZIONALE E SECONDARIO — Suggerimenti cotture: solo se davvero utile, puoi aggiungere al massimo 1-2 suggerimenti su cottura/temperatura per ingredienti già presenti. Usa cottura_consigliata solo tra: crudo, vapore, bollito, griglia, fritto, forno, caramellizzato. Se non essenziale, restituisci array vuoto suggerimenti_cotture.
+3) OPZIONI = SOLO MIRACOLI (M e S devono SALIRE):
+   - Prima di includere un'opzione: i correttivi che ho scelto, in media pesata con il base, portano M verso 7,5 e S più in alto? Se no, cambia i correttivi (più acido/amaro se c'è contrappeso, grammi adeguati, profili bilanciati).
+   - Correttivi: da 2 a 6 per opzione, con GRAMMI ALTI (40–80 g o più per ingrediente ponte) se il base è piccolo o sbilanciato, così la media pesata porta M verso 7,5 e S almeno 15–20. Opzionale: "modifiche_grammi" per riequilibrare le quantità già in ricetta.
+   - Descrizione: spiegare come quella combinazione fa salire M e S.
+   - Se non riesci a ottenere (a mente) S almeno 15–20 con le quantità che scegli, AUMENTA i grammi dei correttivi (es. 60 g lime, 50 g pompelmo, 30 g zenzero) oppure restituisci opzioni_correzione: [].
 
-Restituisci SOLO un JSON valido (nessun markdown):
+4) Suggerimenti cotture: solo se utili, max 1-2. cottura_consigliata in: crudo, vapore, bollito, griglia, fritto, forno, caramellizzato, affumicato, brasato, stufato, saltato, cartoccio, marinato, scottato, confit, padella, wok, glassato, pickle. Altrimenti suggerimenti_cotture: [].
+
+Restituisci SOLO un JSON valido, senza alcun testo prima o dopo (no "Assolutamente", no spiegazioni, no markdown): inizia con { e termina con }.
 {
   "ingredienti": [ { "nome", "grammi", "d", "s", "a", "b", "u", "temp", "melting", "k", "analisi_molecolare" } ],
   "opzioni_correzione": [
-    { "nome": "Hacking Acido con Scorza di Limone", "descrizione": "stringa", "correttivi": [ { "nome", "grammi", "d", "s", "a", "b", "u" } ] },
-    { "nome": "Taglio Lipidico al Sommacco", "descrizione": "stringa", "correttivi": [ ... ] },
-    { "nome": "Contrasto Amaro al Caffè", "descrizione": "stringa", "correttivi": [ ... ] }
+    { "nome": "stringa breve", "descrizione": "stringa", "sostituzioni": [ ], "correttivi": [ ], "modifiche_grammi": [ { "nome": "ingrediente dalla ricetta", "grammi": n } ] },
+    { "nome": "...", "descrizione": "...", "sostituzioni": [ ... ], "correttivi": [ { "nome", "grammi", "d", "s", "a", "b", "u" } ], "modifiche_grammi": [ ] }
   ],
   "suggerimenti_cotture": [ { "ingrediente", "cottura_consigliata", "temperatura_consigliata", "motivo" } ]
 }
-La parte più importante è opzioni_correzione: 2-3 opzioni (con nomi tecnici/avanguardistici) di ingredienti da aggiungere che bilancino il piatto E migliorino magnitudo (M verso 7,5) e soddisfazione (S). Se S_y < 85 per Contrappeso violato, opzioni_correzione NON deve mai essere vuoto. suggerimenti_cotture può essere [].`;
+Ogni opzione: correttivi molecolari/sensoriali (yuzu, matcha, finger lime, acidi, amari) che chiudono il pentagono d/s/a/b/u e fanno SALIRE M e S. Mai consigli salutisti generici; mai opzioni che peggiorano il piatto. "correttivi" (aggiunte), "sostituzioni" al massimo in una opzione. Se il piatto è già ottimale, opzioni_correzione: [].`;
 
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -80,11 +83,18 @@ export async function POST(request: Request) {
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
       systemInstruction: SYSTEM_PROMPT,
+      generationConfig: { temperature: 0 },
     });
     const userContent = `Ricetta:\n${ricetta}\n\nElenco ingredienti Supabase (usa questi nomi quando possibile):\n${elencoSupabase}`;
     const result = await model.generateContent(userContent);
     const raw = result.response.text();
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const cleaned =
+      (() => {
+        const t = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        const start = t.indexOf('{');
+        const end = t.lastIndexOf('}');
+        return start >= 0 && end > start ? t.slice(start, end + 1) : t;
+      })();
     const json = JSON.parse(cleaned) as {
       ingredienti?: Array<{
         nome?: string;
@@ -103,6 +113,8 @@ export async function POST(request: Request) {
         nome?: string;
         descrizione?: string;
         correttivi?: Array<{ nome?: string; grammi?: number; d?: number; s?: number; a?: number; b?: number; u?: number }>;
+        sostituzioni?: Array<{ da?: string; nome?: string; grammi?: number; d?: number; s?: number; a?: number; b?: number; u?: number }>;
+        modifiche_grammi?: Array<{ nome?: string; grammi?: number }>;
       }>;
       suggerimenti_cotture?: Array<{
         ingrediente?: string;
@@ -138,6 +150,20 @@ export async function POST(request: Request) {
         b: Number(c.b ?? 0),
         u: Number(c.u ?? 0),
       })),
+      sostituzioni: (op.sostituzioni ?? []).map((s) => ({
+        da: String(s.da ?? ''),
+        nome: String(s.nome ?? ''),
+        grammi: Math.max(0, Number(s.grammi ?? 0)),
+        d: Number(s.d ?? 0),
+        s: Number(s.s ?? 0),
+        a: Number(s.a ?? 0),
+        b: Number(s.b ?? 0),
+        u: Number(s.u ?? 0),
+      })).filter((s) => s.da && s.nome),
+      modifiche_grammi: (op.modifiche_grammi ?? []).map((m) => ({
+        nome: String(m.nome ?? '').trim(),
+        grammi: Math.max(0, Number(m.grammi ?? 0)),
+      })).filter((m) => m.nome),
     }));
 
     const suggerimentiCotture = (json.suggerimenti_cotture ?? []).map((s) => ({
