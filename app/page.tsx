@@ -825,6 +825,35 @@ function TabCostaIndex() {
   const [alimento, setAlimento] = useState('');
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [suggerimentiDb, setSuggerimentiDb] = useState<{ id: string; nome: string }[]>([]);
+  const [suggerimentiOpen, setSuggerimentiOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchSuggerimenti = useCallback(async (q: string) => {
+    const trimmed = q.trim();
+    if (trimmed.length < 2) {
+      setSuggerimentiDb([]);
+      return;
+    }
+    const { data } = await supabase
+      .from('matrice_ingredienti')
+      .select('id, nome')
+      .ilike('nome', `%${trimmed}%`)
+      .limit(20);
+    setSuggerimentiDb((data ?? []).map((r: { id: string; nome: string }) => ({ id: r.id, nome: r.nome })));
+    setSuggerimentiOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!alimento.trim()) {
+      setSuggerimentiDb([]);
+      setSuggerimentiOpen(false);
+      return;
+    }
+    debounceRef.current = setTimeout(() => { fetchSuggerimenti(alimento); }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [alimento, fetchSuggerimenti]);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -948,14 +977,35 @@ function TabCostaIndex() {
       </p>
 
       <form onSubmit={handleScanAndAdd} className="flex flex-wrap gap-2 mb-6">
-        <input
-          type="text"
-          placeholder="Nome alimento..."
-          value={alimento}
-          onChange={(e) => setAlimento(e.target.value)}
-          disabled={scanLoading}
-          className="flex-1 min-w-[200px] bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] placeholder-zinc-500 focus:border-emerald-600 outline-none disabled:opacity-60"
-        />
+        <div className="flex-1 min-w-[200px] relative">
+          <input
+            type="text"
+            placeholder="Nome alimento (es. ostriche)..."
+            value={alimento}
+            onChange={(e) => setAlimento(e.target.value)}
+            onFocus={() => suggerimentiDb.length > 0 && setSuggerimentiOpen(true)}
+            onBlur={() => setTimeout(() => setSuggerimentiOpen(false), 180)}
+            disabled={scanLoading}
+            className="w-full bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] placeholder-zinc-500 focus:border-emerald-600 outline-none disabled:opacity-60"
+          />
+          {suggerimentiOpen && suggerimentiDb.length > 0 && (
+            <ul
+              className="absolute left-0 right-0 top-full mt-1 z-20 max-h-60 overflow-auto rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl"
+              role="listbox"
+            >
+              {suggerimentiDb.map((row) => (
+                <li
+                  key={row.id}
+                  role="option"
+                  onMouseDown={(e) => { e.preventDefault(); setAlimento(row.nome); setSuggerimentiOpen(false); }}
+                  className="px-3 py-2 text-sm text-[#fafafa] hover:bg-zinc-800 cursor-pointer border-b border-zinc-800 last:border-0"
+                >
+                  {row.nome}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <button
           type="submit"
           disabled={scanLoading}
@@ -1122,6 +1172,25 @@ function TabOttimizzatoreRicette() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ricetteGenerate, setRicetteGenerate] = useState<Record<number, string[]>>({});
   const [generaLoading, setGeneraLoading] = useState<number | null>(null);
+  const [suggerimentiDbOtt, setSuggerimentiDbOtt] = useState<{ id: string; nome: string }[]>([]);
+  const [suggerimentiRigaIndex, setSuggerimentiRigaIndex] = useState<number | null>(null);
+  const debounceOttRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchSuggerimentiOttimizzatore = useCallback(async (q: string, rowIndex: number) => {
+    const trimmed = q.trim();
+    if (trimmed.length < 2) {
+      setSuggerimentiDbOtt([]);
+      setSuggerimentiRigaIndex(null);
+      return;
+    }
+    const { data } = await supabase
+      .from('matrice_ingredienti')
+      .select('id, nome')
+      .ilike('nome', `%${trimmed}%`)
+      .limit(20);
+    setSuggerimentiDbOtt((data ?? []).map((r: { id: string; nome: string }) => ({ id: r.id, nome: r.nome })));
+    setSuggerimentiRigaIndex(rowIndex);
+  }, []);
 
   /** Mostriamo tutte le opzioni; segnaliamo quando il miglioramento è insufficiente (S < 15 o S non migliora). */
   const SOGLIA_SODDISFAZIONE_MIN = 15;
@@ -1348,14 +1417,49 @@ function TabOttimizzatoreRicette() {
           <p className="text-zinc-500 text-sm mb-3">Inserisci ingrediente, quantità in grammi e tipo di cottura. Poi clicca Analizza.</p>
           {righe.map((riga, i) => (
             <div key={i} className="flex flex-wrap items-center gap-2 p-3 bg-[#09090b] border border-zinc-800 rounded-lg">
-              <input
-                type="text"
-                placeholder="Ingrediente"
-                value={riga.ingrediente}
-                onChange={(e) => updateRiga(i, 'ingrediente', e.target.value)}
-                disabled={isLoading}
-                className="flex-1 min-w-[120px] bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-[#fafafa] placeholder-zinc-500 focus:border-[#dc2626] outline-none"
-              />
+              <div className="flex-1 min-w-[120px] relative">
+                <input
+                  type="text"
+                  placeholder="Ingrediente (es. ostriche)"
+                  value={riga.ingrediente}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    updateRiga(i, 'ingrediente', v);
+                    if (debounceOttRef.current) clearTimeout(debounceOttRef.current);
+                    if (!v.trim()) {
+                      setSuggerimentiDbOtt([]);
+                      setSuggerimentiRigaIndex(null);
+                      return;
+                    }
+                    debounceOttRef.current = setTimeout(() => { fetchSuggerimentiOttimizzatore(v, i); }, 300);
+                  }}
+                  onFocus={() => suggerimentiRigaIndex === i && suggerimentiDbOtt.length > 0 && setSuggerimentiRigaIndex(i)}
+                  onBlur={() => setTimeout(() => setSuggerimentiRigaIndex(null), 180)}
+                  disabled={isLoading}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-[#fafafa] placeholder-zinc-500 focus:border-[#dc2626] outline-none"
+                />
+                {suggerimentiRigaIndex === i && suggerimentiDbOtt.length > 0 && (
+                  <ul
+                    className="absolute left-0 right-0 top-full mt-1 z-20 max-h-48 overflow-auto rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl"
+                    role="listbox"
+                  >
+                    {suggerimentiDbOtt.map((row) => (
+                      <li
+                        key={row.id}
+                        role="option"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          updateRiga(i, 'ingrediente', row.nome);
+                          setSuggerimentiRigaIndex(null);
+                        }}
+                        className="px-3 py-2 text-sm text-[#fafafa] hover:bg-zinc-800 cursor-pointer border-b border-zinc-800 last:border-0"
+                      >
+                        {row.nome}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <input
                 type="number"
                 placeholder="g"
