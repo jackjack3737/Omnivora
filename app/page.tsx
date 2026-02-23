@@ -821,6 +821,7 @@ function TabScanDetector() {
 function TabCostaIndex() {
   const [items, setItems] = useState<CostaIndexItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number>(0);
   const [alimento, setAlimento] = useState('');
   const [scanLoading, setScanLoading] = useState(false);
@@ -857,12 +858,14 @@ function TabCostaIndex() {
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     const { data, error } = await supabase
       .from(COSTA_INDEX_TABLE)
       .select('id, payload')
       .order('created_at', { ascending: true });
     if (error) {
       setItems([]);
+      setFetchError(error.message || 'Errore caricamento Costa Index');
     } else {
       setItems((data ?? []).map((row: { id: string; payload: ScanResult }) => ({ id: row.id, ...row.payload })));
     }
@@ -1018,15 +1021,28 @@ function TabCostaIndex() {
         <p className="text-red-400 text-sm mb-4">{scanError}</p>
       )}
 
+      {fetchError && (
+        <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-4 mb-4 text-amber-200 text-sm">
+          <p className="font-medium">Errore Costa Index</p>
+          <p className="mt-1">{fetchError}</p>
+          <p className="mt-2 text-amber-300/80 text-xs">
+            Verifica: variabili Supabase su Vercel (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY), tabella costa_index_items creata in Supabase e policy RLS consentite per anon.
+          </p>
+          <button type="button" onClick={() => fetchItems()} className="mt-2 px-3 py-1.5 rounded bg-amber-700 hover:bg-amber-600 text-white text-xs font-medium">
+            Riprova
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="rounded-xl border border-zinc-700 bg-zinc-900/40 p-8 text-center text-zinc-500">
           Caricamento…
         </div>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && !fetchError ? (
         <div className="rounded-xl border border-zinc-700 bg-zinc-900/40 p-8 text-center text-zinc-500">
           Nessun alimento in Costa Index. Inserisci un alimento nella casella sopra e clicca &quot;Analizza e aggiungi&quot; (analisi con Gemini).
         </div>
-      ) : (
+      ) : items.length === 0 ? null : (
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex-1 min-w-0 space-y-6">
             {/* Gauge Costa Index */}
