@@ -29,6 +29,7 @@ import { RadarChartPentagon } from '@/components/RadarChart';
 import { LaboratoryReport01 } from '@/components/LaboratoryReport';
 import { AddToCostaIndexButton } from '@/components/AddToCostaIndexButton';
 import { itemColor, CostaIndexRadarMulti, CostaIndexSystemicChart } from '@/components/CostaIndexCharts';
+import SintetizzatoreVegano from '@/components/SintetizzatoreVegano';
 
 type TabId = 'sintetizzatore' | 'ottimizzatore' | 'svuota-frigo' | 'radar-km0' | 'costa-index';
 
@@ -249,15 +250,16 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#09090b] text-[#fafafa] font-sans">
-      <div className="max-w-4xl mx-auto p-6 sm:p-8">
-        <h1 className="text-4xl font-black text-[#dc2626] mb-2 uppercase tracking-tighter">
+      <div className="max-w-4xl mx-auto px-4 py-5 sm:p-8">
+        <h1 className="text-3xl sm:text-4xl font-black text-[#dc2626] mb-2 uppercase tracking-tighter">
           Omnivora
         </h1>
-        <p className="text-zinc-500 mb-6 font-mono text-sm">Suite di Laboratorio</p>
+        <p className="text-zinc-500 mb-4 sm:mb-6 font-mono text-sm">Suite di Laboratorio</p>
 
         <nav
-          className="flex flex-wrap gap-1 border-b border-zinc-800 mb-6"
+          className="flex overflow-x-auto overflow-y-hidden gap-0 border-b border-zinc-800 mb-4 sm:mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide"
           role="tablist"
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {TABS.map(({ id, label }) => (
             <button
@@ -266,7 +268,7 @@ export default function Home() {
               role="tab"
               aria-selected={activeTab === id}
               onClick={() => setActiveTab(id)}
-              className={`px-4 py-3 font-semibold text-sm transition-colors border-b-2 -mb-px ${
+              className={`flex-shrink-0 px-4 py-3.5 min-h-[44px] font-semibold text-sm transition-colors border-b-2 -mb-px ${
                 activeTab === id
                   ? 'text-[#dc2626] border-[#dc2626] bg-zinc-900/50'
                   : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:border-zinc-700'
@@ -277,49 +279,17 @@ export default function Home() {
           ))}
         </nav>
 
-        {activeTab === 'sintetizzatore' && <TabSintetizzatoreVegano />}
+        {activeTab === 'sintetizzatore' && (
+          <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 sm:p-6 shadow-xl">
+            <SintetizzatoreVegano />
+          </section>
+        )}
         {activeTab === 'ottimizzatore' && <TabOttimizzatoreRicette onOpenCostaIndex={() => setActiveTab('costa-index')} />}
         {activeTab === 'svuota-frigo' && <TabSvuotaFrigo />}
         {activeTab === 'radar-km0' && <TabRadarKm0 />}
         {activeTab === 'costa-index' && <TabCostaIndex />}
       </div>
     </div>
-  );
-}
-
-function TabSintetizzatoreVegano() {
-  const [carneSelezionata, setCarneSelezionata] = useState('');
-  const carni = ['Pollo', 'Manzo', 'Maiale', 'Agnello', 'Tacchino', 'Salsiccia'];
-
-  return (
-    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
-      <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
-        Sintetizzatore Vegano
-      </h2>
-      <p className="text-zinc-500 text-sm mb-6">
-        Scegli la carne da replicare con ingredienti vegetali. Combinazioni e analisi saranno disponibili qui.
-      </p>
-      <label className="block text-sm font-medium text-zinc-400 mb-2">
-        Scegli la carne da replicare
-      </label>
-      <select
-        value={carneSelezionata}
-        onChange={(e) => setCarneSelezionata(e.target.value)}
-        className="w-full max-w-xs bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] focus:border-[#dc2626] focus:ring-1 focus:ring-[#dc2626] outline-none"
-      >
-        <option value="">— Seleziona —</option>
-        {carni.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
-      {carneSelezionata && (
-        <p className="mt-4 text-zinc-400 text-sm">
-          Replica di <span className="text-[#dc2626]">{carneSelezionata}</span> in arrivo.
-        </p>
-      )}
-    </section>
   );
 }
 
@@ -337,7 +307,7 @@ function TabSvuotaFrigo() {
   };
 
   return (
-    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
+    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 sm:p-6 shadow-xl">
       <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
         Svuota Frigo
       </h2>
@@ -378,7 +348,7 @@ function TabSvuotaFrigo() {
 
 function TabRadarKm0() {
   return (
-    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
+    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 sm:p-6 shadow-xl">
       <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
         Radar Km 0
       </h2>
@@ -571,33 +541,35 @@ function TabScanDetector() {
   };
 
   return (
-    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
+    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 sm:p-6 shadow-xl">
       <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
         Scan Detector
       </h2>
-      <form onSubmit={handleSubmit} className="flex flex-wrap gap-2 mb-6">
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row flex-wrap gap-2 mb-6">
         <input
           type="text"
           placeholder="Nome alimento..."
           value={alimento}
           onChange={(e) => setAlimento(e.target.value)}
           disabled={isLoading}
-          className="flex-1 min-w-0 bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] placeholder-zinc-500 focus:border-[#dc2626] outline-none disabled:opacity-60"
+          className="flex-1 min-w-0 bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] placeholder-zinc-500 focus:border-[#dc2626] outline-none disabled:opacity-60 text-base"
         />
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="bg-[#dc2626] hover:bg-red-700 text-white font-semibold px-4 rounded-lg transition-colors disabled:opacity-50"
-        >
-          {isLoading ? 'Analisi neurale in corso...' : 'Analizza'}
-        </button>
-        <button
-          type="button"
-          onClick={() => { setResults([]); setSelectedIndex(null); }}
-          className="bg-zinc-700 hover:bg-zinc-600 text-white font-medium px-3 py-2 rounded-lg transition-colors text-sm"
-        >
-          Pulisci Grafico
-        </button>
+        <div className="flex gap-2 flex-shrink-0">
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="flex-1 sm:flex-none bg-[#dc2626] hover:bg-red-700 text-white font-semibold px-4 py-3 min-h-[44px] rounded-lg transition-colors disabled:opacity-50"
+          >
+            {isLoading ? 'Analisi neurale in corso...' : 'Analizza'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setResults([]); setSelectedIndex(null); }}
+            className="bg-zinc-700 hover:bg-zinc-600 text-white font-medium px-3 py-2 min-h-[44px] rounded-lg transition-colors text-sm"
+          >
+            Pulisci Grafico
+          </button>
+        </div>
       </form>
       {error && (
         <p className="text-[#dc2626] text-sm mb-4">{error}</p>
@@ -1017,7 +989,7 @@ function TabCostaIndex() {
   const bottom = svgH * (1 - marginY);
 
   return (
-    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
+    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 sm:p-6 shadow-xl">
       <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
         Costa Index — Plancia di bio-hacking
       </h2>
@@ -1025,8 +997,8 @@ function TabCostaIndex() {
         Dati salvati su Supabase. Tutti i grafici mostrano tutti gli alimenti; clicca in legenda per mettere a fuoco uno.
       </p>
 
-      <form onSubmit={handleScanAndAdd} className="flex flex-wrap gap-2 mb-6">
-        <div className="flex-1 min-w-[200px] relative">
+      <form onSubmit={handleScanAndAdd} className="flex flex-col sm:flex-row flex-wrap gap-2 mb-6">
+        <div className="flex-1 min-w-0 relative">
           <input
             type="text"
             placeholder="Nome alimento (es. ostriche)..."
@@ -1035,7 +1007,7 @@ function TabCostaIndex() {
             onFocus={() => suggerimentiDb.length > 0 && setSuggerimentiOpen(true)}
             onBlur={() => setTimeout(() => setSuggerimentiOpen(false), 180)}
             disabled={scanLoading}
-            className="w-full bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] placeholder-zinc-500 focus:border-emerald-600 outline-none disabled:opacity-60"
+            className="w-full bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] placeholder-zinc-500 focus:border-emerald-600 outline-none disabled:opacity-60 text-base"
           />
           {suggerimentiOpen && suggerimentiDb.length > 0 && (
             <ul
@@ -1058,7 +1030,7 @@ function TabCostaIndex() {
         <button
           type="submit"
           disabled={scanLoading}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-3 rounded-lg transition-colors disabled:opacity-50"
+          className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-3 min-h-[44px] rounded-lg transition-colors disabled:opacity-50"
         >
           {scanLoading ? 'Analisi in corso…' : 'Analizza e aggiungi'}
         </button>
@@ -1302,15 +1274,28 @@ function TabOttimizzatoreRicette({ onOpenCostaIndex }: { onOpenCostaIndex?: () =
       setGraphPanX(panStartRef.current.startPanX + e.clientX - panStartRef.current.x);
       setGraphPanY(panStartRef.current.startPanY + e.clientY - panStartRef.current.y);
     };
+    const onTouchMove = (e: TouchEvent) => {
+      if (panStartRef.current == null || e.touches.length === 0) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      setGraphPanX(panStartRef.current.startPanX + t.clientX - panStartRef.current.x);
+      setGraphPanY(panStartRef.current.startPanY + t.clientY - panStartRef.current.y);
+    };
     const onUp = () => {
       panStartRef.current = null;
       setIsPanning(false);
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
     return () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onUp);
+      window.removeEventListener('touchcancel', onUp);
     };
   }, []);
 
@@ -1318,6 +1303,14 @@ function TabOttimizzatoreRicette({ onOpenCostaIndex }: { onOpenCostaIndex?: () =
     if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
     panStartRef.current = { x: e.clientX, y: e.clientY, startPanX: graphPanX, startPanY: graphPanY };
+    setIsPanning(true);
+  };
+
+  const handleGraphPanStartTouch = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    if (e.touches.length === 0) return;
+    const t = e.touches[0];
+    panStartRef.current = { x: t.clientX, y: t.clientY, startPanX: graphPanX, startPanY: graphPanY };
     setIsPanning(true);
   };
 
@@ -1490,7 +1483,7 @@ function TabOttimizzatoreRicette({ onOpenCostaIndex }: { onOpenCostaIndex?: () =
   }, []);
 
   return (
-    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
+    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 sm:p-6 shadow-xl">
       <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
         Masterchaif
       </h2>
@@ -1582,11 +1575,11 @@ function TabOttimizzatoreRicette({ onOpenCostaIndex }: { onOpenCostaIndex?: () =
             + Aggiungi altro ingrediente
           </button>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2">
           <button
             type="submit"
             disabled={isLoading}
-            className="bg-[#dc2626] hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+            className="w-full sm:w-auto bg-[#dc2626] hover:bg-red-700 text-white font-semibold px-4 py-3 min-h-[44px] rounded-lg transition-colors disabled:opacity-50"
           >
             {isLoading ? 'Analisi ricetta in corso...' : 'Analizza ricetta'}
           </button>
@@ -1604,7 +1597,7 @@ function TabOttimizzatoreRicette({ onOpenCostaIndex }: { onOpenCostaIndex?: () =
               setRicetta('');
               setRighe(Array.from({ length: RIGHE_INIZIALI_OTTIMIZZATORE }, () => ({ ingrediente: '', grammi: 0, cottura: '' })));
             }}
-            className="bg-zinc-700 hover:bg-zinc-600 text-white font-medium px-3 py-2 rounded-lg transition-colors text-sm"
+            className="w-full sm:w-auto bg-zinc-700 hover:bg-zinc-600 text-white font-medium px-3 py-3 min-h-[44px] rounded-lg transition-colors text-sm"
           >
             Pulisci
           </button>
@@ -1906,6 +1899,7 @@ function TabOttimizzatoreRicette({ onOpenCostaIndex }: { onOpenCostaIndex?: () =
             <div
               role="presentation"
               onMouseDown={handleGraphPanStart}
+              onTouchStart={handleGraphPanStartTouch}
               style={{
                 transform: `translate(${graphPanX}px, ${graphPanY}px) scale(${graphZoom})`,
                 transformOrigin: 'center center',
