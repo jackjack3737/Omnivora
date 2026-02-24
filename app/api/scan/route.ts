@@ -10,6 +10,7 @@ TEOREMA DEL CONTRAPPESO: Se l'alimento ha altissimo Umami/Dolce/Salato ma zero o
 Per l'alimento richiesto restituisci SOLO un JSON valido con le seguenti chiavi (nessun markdown, nessun testo fuori dal JSON):
 
 - d, s, a, b, u: numeri decimali tra 0.0 e 5.0 (dolce, salato, acido, amaro, umami).
+- cg: numero decimale tra 0.0 e 5.0, Carico Glicemico. La chiave cg (Carico Glicemico, 0.0 - 5.0) serve a valutare l'impatto degli amidi raffinati (es. farina 00, riso bianco, patate) che non sono dolci sulla lingua ma esplodono nel sangue come glucosio puro. Valutalo rigorosamente.
 - temp: numero, temperatura di consumo tipica in °C. Opzionale; default 20.
 - melting: numero 0-5, intensità texture melting/cremoso. Opzionale; default 0.
 - k: numero 0-1, costante di decadimento sensoriale. Opzionale; default 0.3.
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
       a?: number;
       b?: number;
       u?: number;
+      cg?: number;
       temp?: number;
       melting?: number;
       k?: number;
@@ -84,6 +86,7 @@ export async function POST(request: Request) {
     const a = Number(json.a ?? 0);
     const b = Number(json.b ?? 0);
     const u = Number(json.u ?? 0);
+    const cg = Number(json.cg ?? 0);
     const temp = json.temp !== undefined ? Number(json.temp) : 20;
     const melting = json.melting !== undefined ? Number(json.melting) : 0;
     const k = json.k !== undefined ? Number(json.k) : 0.3;
@@ -96,6 +99,7 @@ export async function POST(request: Request) {
       a,
       b,
       u,
+      cg,
       temp,
       melting,
       k,

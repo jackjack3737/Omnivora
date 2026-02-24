@@ -16,6 +16,8 @@ export type ScanResult = {
   a: number;
   b: number;
   u: number;
+  /** Carico glicemico (0.0–5.0), disaccoppiato dal sapore dolce percepito. */
+  cg?: number;
   loopEdonico: boolean;
   temp: number;
   melting: number;
@@ -227,16 +229,41 @@ export function computePiattoFromResults(scanResults: ScanResult[]): ScanResult 
   const eff = (r: ScanResult) => getEffectiveProfile(r);
   const totalVirtualG = scanResults.reduce((a, r) => a + virtualWeight(r.grammi ?? 0), 0);
   const div = totalVirtualG > 0 ? totalVirtualG : n;
-  const rawD = totalVirtualG > 0 ? scanResults.reduce((a, r) => a + eff(r).d * virtualWeight(r.grammi ?? 0), 0) / div : scanResults.reduce((a, r) => a + eff(r).d, 0) / n;
-  const rawS = totalVirtualG > 0 ? scanResults.reduce((a, r) => a + eff(r).s * virtualWeight(r.grammi ?? 0), 0) / div : scanResults.reduce((a, r) => a + eff(r).s, 0) / n;
-  const rawA = totalVirtualG > 0 ? scanResults.reduce((a, r) => a + eff(r).a * virtualWeight(r.grammi ?? 0), 0) / div : scanResults.reduce((a, r) => a + eff(r).a, 0) / n;
-  const rawB = totalVirtualG > 0 ? scanResults.reduce((a, r) => a + eff(r).b * virtualWeight(r.grammi ?? 0), 0) / div : scanResults.reduce((a, r) => a + eff(r).b, 0) / n;
-  const rawU = totalVirtualG > 0 ? scanResults.reduce((a, r) => a + eff(r).u * virtualWeight(r.grammi ?? 0), 0) / div : scanResults.reduce((a, r) => a + eff(r).u, 0) / n;
-  const d = Math.min(5, rawD);
-  const s = Math.min(5, rawS);
-  const a = Math.min(5, rawA);
-  const b = Math.min(5, rawB);
-  const u = Math.min(5, rawU);
+  // 1. Calcolo Medie Ponderate
+  const avgD =
+    totalVirtualG > 0
+      ? scanResults.reduce((acc, r) => acc + eff(r).d * virtualWeight(r.grammi ?? 0), 0) / div
+      : scanResults.reduce((acc, r) => acc + eff(r).d, 0) / n;
+  const avgS =
+    totalVirtualG > 0
+      ? scanResults.reduce((acc, r) => acc + eff(r).s * virtualWeight(r.grammi ?? 0), 0) / div
+      : scanResults.reduce((acc, r) => acc + eff(r).s, 0) / n;
+  const avgA =
+    totalVirtualG > 0
+      ? scanResults.reduce((acc, r) => acc + eff(r).a * virtualWeight(r.grammi ?? 0), 0) / div
+      : scanResults.reduce((acc, r) => acc + eff(r).a, 0) / n;
+  const avgB =
+    totalVirtualG > 0
+      ? scanResults.reduce((acc, r) => acc + eff(r).b * virtualWeight(r.grammi ?? 0), 0) / div
+      : scanResults.reduce((acc, r) => acc + eff(r).b, 0) / n;
+  const avgU =
+    totalVirtualG > 0
+      ? scanResults.reduce((acc, r) => acc + eff(r).u * virtualWeight(r.grammi ?? 0), 0) / div
+      : scanResults.reduce((acc, r) => acc + eff(r).u, 0) / n;
+
+  // 2. Estrazione Picchi di Saturazione (il sapore più forte presente nel piatto)
+  const maxD = Math.max(...scanResults.map((r) => eff(r).d));
+  const maxS = Math.max(...scanResults.map((r) => eff(r).s));
+  const maxA = Math.max(...scanResults.map((r) => eff(r).a));
+  const maxB = Math.max(...scanResults.map((r) => eff(r).b));
+  const maxU = Math.max(...scanResults.map((r) => eff(r).u));
+
+  // 3. Modello di Fusione (Media + 40% del Picco)
+  const d = Math.min(5, avgD + maxD * 0.4);
+  const s = Math.min(5, avgS + maxS * 0.4);
+  const a = Math.min(5, avgA + maxA * 0.4);
+  const b = Math.min(5, avgB + maxB * 0.4);
+  const u = Math.min(5, avgU + maxU * 0.4);
   const temp = totalVirtualG > 0 ? scanResults.reduce((a, r) => a + r.temp * virtualWeight(r.grammi ?? 0), 0) / div : scanResults.reduce((a, r) => a + r.temp, 0) / n;
   const melting = totalVirtualG > 0 ? scanResults.reduce((a, r) => a + r.melting * virtualWeight(r.grammi ?? 0), 0) / div : scanResults.reduce((a, r) => a + r.melting, 0) / n;
   const k = totalVirtualG > 0 ? scanResults.reduce((a, r) => a + r.k * virtualWeight(r.grammi ?? 0), 0) / div : scanResults.reduce((a, r) => a + r.k, 0) / n;
@@ -371,6 +398,7 @@ export function computeCostaIndex(item: ScanResult | null): CostaIndexEsito | nu
   if (!item) return null;
   const d = item.d ?? 0;
   const s = item.s ?? 0;
+  const cg = item.cg ?? 0;
   const b = item.b ?? 0;
   const u = item.u ?? 0;
   const temp = item.temp ?? 20;
@@ -379,7 +407,7 @@ export function computeCostaIndex(item: ScanResult | null): CostaIndexEsito | nu
   const magnitudo = getMagnitudoFromItem(item);
 
   const Eb = magnitudo * 1.5 + melting * 2 + Math.abs(37 - temp) / 10;
-  const R_gly = Math.max(0, d - b * 2) / 2;
+  const R_gly = Math.max(0, Math.max(d, cg) - b * 2) / 2;
   const R_hep = (u * s * melting) / 40;
   const R_dop = Math.max(0, magnitudo - 5) * k;
   const Conto = 1.0 + R_gly + R_hep + R_dop;
@@ -418,14 +446,16 @@ export function getCostaIndexChartData(item: ScanResult, options: CostaIndexChar
   const d = item.d ?? 0;
   const s = item.s ?? 0;
   const a = item.a ?? 0;
+  const b = item.b ?? 0;
   const u = item.u ?? 0;
+  const cg = item.cg ?? 0;
   const temp = item.temp ?? 20;
   const melting = item.melting ?? 0;
   const k = item.k ?? 0.3;
   const magnitudo = getMagnitudoFromItem(item);
 
   const Eb = magnitudo * 1.5 + melting * 2 + Math.abs(37 - temp) / 10;
-  const R_gly = Math.max(0, d - (item.b ?? 0) * 2) / 2;
+  const R_gly = Math.max(0, Math.max(d, cg) - b * 2) / 2;
   const R_hep = (u * s * melting) / 40;
   const R_dop = Math.max(0, magnitudo - 5) * k;
   const Conto = 1.0 + R_gly + R_hep + R_dop;

@@ -7,7 +7,7 @@ REGOLA DELLA MAGNITUDO: Vietato "fare la media" o appiattire i valori. Per alime
 
 TEOREMA DEL CONTRAPPESO: Se un alimento ha altissimo Umami/Dolce/Salato ma zero Acido/Amaro, il sistema andrà in "Food Coma" e il punteggio Costa Index crollerà. Assegna (a) e (b) in modo coerente con la chimica reale dell'alimento.
 
-Output: Restituisci SOLO un JSON valido con 5 chiavi: d (dolce), s (salato), a (acido), b (amaro), u (umami). Valori decimali rigorosamente tra 0.0 e 5.0. Nessun markdown o testo extra.`;
+Output: Restituisci SOLO un JSON valido con 6 chiavi: d (dolce), s (salato), a (acido), b (amaro), u (umami), cg (Carico Glicemico). La chiave cg (Carico Glicemico, 0.0 - 5.0) serve a valutare l'impatto degli amidi raffinati (es. farina 00, riso bianco, patate) che non sono dolci sulla lingua ma esplodono nel sangue come glucosio puro. Valutalo rigorosamente. Valori decimali rigorosamente tra 0.0 e 5.0 per tutte le chiavi. Nessun markdown o testo extra.`;
 
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -46,15 +46,16 @@ export async function POST(request: Request) {
     const result = await model.generateContent(alimento);
     const raw = result.response.text();
     const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    const json = JSON.parse(cleaned) as { d?: number; s?: number; a?: number; b?: number; u?: number };
+    const json = JSON.parse(cleaned) as { d?: number; s?: number; a?: number; b?: number; u?: number; cg?: number };
 
     const d = Number(json.d ?? 0);
     const s = Number(json.s ?? 0);
     const a = Number(json.a ?? 0);
     const b = Number(json.b ?? 0);
     const u = Number(json.u ?? 0);
+    const cg = Number(json.cg ?? 0);
 
-    return NextResponse.json({ d, s, a, b, u });
+    return NextResponse.json({ d, s, a, b, u, cg });
   } catch (err) {
     console.error('Scan API error:', err);
     return NextResponse.json(

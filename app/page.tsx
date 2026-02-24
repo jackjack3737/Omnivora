@@ -30,7 +30,7 @@ import { LaboratoryReport01 } from '@/components/LaboratoryReport';
 import { AddToCostaIndexButton } from '@/components/AddToCostaIndexButton';
 import { itemColor, CostaIndexRadarMulti, CostaIndexSystemicChart } from '@/components/CostaIndexCharts';
 
-type TabId = 'sintetizzatore' | 'ottimizzatore' | 'svuota-frigo' | 'radar-km0' | 'scan-detector' | 'costa-index';
+type TabId = 'sintetizzatore' | 'ottimizzatore' | 'svuota-frigo' | 'radar-km0' | 'costa-index';
 
 type Microelementi = {
   ingrediente_id?: string;
@@ -72,9 +72,8 @@ function toNum(v: unknown): number {
 }
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'scan-detector', label: 'Scan Detector' },
   { id: 'costa-index', label: 'Costa Index' },
-  { id: 'ottimizzatore', label: 'Ottimizzatore Ricette' },
+  { id: 'ottimizzatore', label: 'Masterchaif' },
   { id: 'sintetizzatore', label: 'Sintetizzatore Vegano' },
   { id: 'svuota-frigo', label: 'Svuota Frigo' },
   { id: 'radar-km0', label: 'Radar Km 0' },
@@ -279,10 +278,9 @@ export default function Home() {
         </nav>
 
         {activeTab === 'sintetizzatore' && <TabSintetizzatoreVegano />}
-        {activeTab === 'ottimizzatore' && <TabOttimizzatoreRicette />}
+        {activeTab === 'ottimizzatore' && <TabOttimizzatoreRicette onOpenCostaIndex={() => setActiveTab('costa-index')} />}
         {activeTab === 'svuota-frigo' && <TabSvuotaFrigo />}
         {activeTab === 'radar-km0' && <TabRadarKm0 />}
-        {activeTab === 'scan-detector' && <TabScanDetector />}
         {activeTab === 'costa-index' && <TabCostaIndex />}
       </div>
     </div>
@@ -515,6 +513,7 @@ function TabScanDetector() {
         a?: number;
         b?: number;
         u?: number;
+        cg?: number;
         temp?: number;
         melting?: number;
         oscore?: number;
@@ -536,6 +535,7 @@ function TabScanDetector() {
       const a = data.a ?? 0;
       const b = data.b ?? 0;
       const u = data.u ?? 0;
+      const cg = data.cg ?? 0;
       const temp = data.temp ?? 20;
       const melting = data.melting ?? 0;
       const oscore = data.oscore ?? 1;
@@ -554,6 +554,7 @@ function TabScanDetector() {
         a,
         b,
         u,
+        cg,
         loopEdonico,
         temp,
         melting,
@@ -632,6 +633,49 @@ function TabScanDetector() {
               </div>
             );
           })}
+        </div>
+      )}
+      {piattoAggregato && (
+        <div className="mb-6 rounded-lg border border-zinc-800 bg-[#09090b] p-4">
+          {(() => {
+            const det = dettaglioCalcolo(piattoAggregato);
+            const analisi = piccolaAnalisi(piattoAggregato, det);
+            return (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                  <h3 className="text-sm font-semibold text-[#fafafa]">Analisi del piatto originale</h3>
+                  <button
+                    type="button"
+                    disabled={savingCostaIndex}
+                    onClick={handleSavePiattoToCostaIndex}
+                    className="text-xs px-3 py-1 rounded-full border border-emerald-600 text-emerald-200 hover:bg-emerald-900/60 disabled:opacity-60"
+                  >
+                    {savingCostaIndex ? 'Salvataggio…' : 'Vedi questo piatto in Costa Index'}
+                  </button>
+                </div>
+                <p className="text-xs text-zinc-500 mb-2">
+                  Sintesi complessiva (prima delle correzioni) calcolata come fusione tra media pesata degli ingredienti e picchi di saturazione.
+                </p>
+                <p className="text-sm text-[#fafafa]">
+                  <span className="text-zinc-500">Magnitudo M globale</span> = {det.M.toFixed(2)} ·{' '}
+                  <span className="text-zinc-500">Soddisfazione S globale</span> = {piattoAggregato.soddisfazione.toFixed(0)}/100
+                </p>
+                <div className="mt-3 pt-3 border-t border-zinc-800 text-xs text-zinc-400 space-y-2">
+                  <p className="font-medium text-zinc-500">Lettura laboratorio</p>
+                  <p>{analisi.profilo}</p>
+                  <p>{analisi.magnitudo}</p>
+                  {analisi.correzioni.length > 0 && (
+                    <ul className="list-disc list-inside space-y-1">
+                      {analisi.correzioni.map((c, j) => (
+                        <li key={j}>{c}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="text-[#e4e4e7]">{analisi.sintesi}</p>
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -891,7 +935,7 @@ function TabCostaIndex() {
       const rawText = await res.text();
       let data: {
         error?: string;
-        d?: number; s?: number; a?: number; b?: number; u?: number;
+        d?: number; s?: number; a?: number; b?: number; u?: number; cg?: number;
         temp?: number; melting?: number; oscore?: number; k?: number;
         analisi_molecolare?: string;
       };
@@ -910,6 +954,7 @@ function TabCostaIndex() {
       const a = Number(data.a ?? 0);
       const b = Number(data.b ?? 0);
       const u = Number(data.u ?? 0);
+      const cg = Number(data.cg ?? 0);
       const temp = data.temp !== undefined ? Number(data.temp) : 20;
       const melting = data.melting !== undefined ? Number(data.melting) : 0;
       const oscore = data.oscore !== undefined ? Number(data.oscore) : 1;
@@ -924,6 +969,7 @@ function TabCostaIndex() {
         asseX,
         asseY,
         d, s, a, b, u,
+        cg,
         loopEdonico,
         temp,
         melting,
@@ -1166,14 +1212,14 @@ type RigaIngrediente = { ingrediente: string; grammi: number; cottura: string };
 
 const RIGHE_INIZIALI_OTTIMIZZATORE = 5;
 
-function TabOttimizzatoreRicette() {
+function TabOttimizzatoreRicette({ onOpenCostaIndex }: { onOpenCostaIndex?: () => void }) {
   const [ricetta, setRicetta] = useState('');
   const [righe, setRighe] = useState<RigaIngrediente[]>(() =>
     Array.from({ length: RIGHE_INIZIALI_OTTIMIZZATORE }, () => ({ ingrediente: '', grammi: 0, cottura: '' }))
   );
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<ScanResult[]>([]);
-  const [piattoResult, setPiattoResult] = useState<ScanResult | null>(null);
+  const [piattoAggregato, setPiattoAggregato] = useState<ScanResult | null>(null);
   const [opzioniCorrezione, setOpzioniCorrezione] = useState<OpzioneCorrezione[]>([]);
   const [suggerimentiCotture, setSuggerimentiCotture] = useState<SuggerimentoCottura[]>([]);
   const [piattoCorrettoResults, setPiattoCorrettoResults] = useState<ScanResult[]>([]);
@@ -1191,6 +1237,7 @@ function TabOttimizzatoreRicette() {
   const [suggerimentiDbOtt, setSuggerimentiDbOtt] = useState<{ id: string; nome: string }[]>([]);
   const [suggerimentiRigaIndex, setSuggerimentiRigaIndex] = useState<number | null>(null);
   const debounceOttRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [savingCostaIndex, setSavingCostaIndex] = useState(false);
 
   const fetchSuggerimentiOttimizzatore = useCallback(async (q: string, rowIndex: number) => {
     const trimmed = q.trim();
@@ -1208,6 +1255,23 @@ function TabOttimizzatoreRicette() {
     setSuggerimentiRigaIndex(rowIndex);
   }, []);
 
+  const handleSavePiattoToCostaIndex = useCallback(async () => {
+    if (!piattoAggregato || savingCostaIndex) return;
+    setSavingCostaIndex(true);
+    try {
+      const { error } = await supabase.from(COSTA_INDEX_TABLE).insert({ payload: piattoAggregato });
+      if (error) {
+        setError(error.message || 'Errore salvataggio in Costa Index');
+        return;
+      }
+      if (onOpenCostaIndex) onOpenCostaIndex();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Errore salvataggio in Costa Index');
+    } finally {
+      setSavingCostaIndex(false);
+    }
+  }, [piattoAggregato, onOpenCostaIndex, savingCostaIndex]);
+
   /** Mostriamo tutte le opzioni; segnaliamo quando il miglioramento è insufficiente (S < 15 o S non migliora). */
   const SOGLIA_SODDISFAZIONE_MIN = 15;
   const allOptionIndices = useMemo((): number[] => {
@@ -1215,14 +1279,14 @@ function TabOttimizzatoreRicette() {
   }, [piattoCorrettoResults.length]);
 
   const graphPoints = useMemo(() => {
-    const base = piattoResult ? [piattoResult] : [];
+    const base = piattoAggregato ? [piattoAggregato] : [];
     return [...base, ...piattoCorrettoResults] as ScanResult[];
-  }, [piattoResult, piattoCorrettoResults]);
-  const radarResult = graphPoints[selectedGraphIndex] ?? piattoResult;
+  }, [piattoAggregato, piattoCorrettoResults]);
+  const radarResult = graphPoints[selectedGraphIndex] ?? piattoAggregato;
 
   useEffect(() => {
     if (results.length === 0) return;
-    setPiattoResult(computePiattoFromResults(results));
+    setPiattoAggregato(computePiattoFromResults(results));
     if (opzioniCorrezione.length > 0) setPiattoCorrettoResults(computeCorrectedFromResults(results, opzioniCorrezione));
   }, [results, opzioniCorrezione]);
 
@@ -1361,7 +1425,7 @@ function TabOttimizzatoreRicette() {
         setError((data as { error?: string }).error || `Errore ${res.status}`);
         return;
       }
-      const ing = (data as { ingredienti?: Array<{ nome: string; grammi?: number; d?: number; s?: number; a?: number; b?: number; u?: number; temp?: number; melting?: number; k?: number; analisi_molecolare?: string }> }).ingredienti ?? [];
+      const ing = (data as { ingredienti?: Array<{ nome: string; grammi?: number; d?: number; s?: number; a?: number; b?: number; u?: number; cg?: number; temp?: number; melting?: number; k?: number; analisi_molecolare?: string }> }).ingredienti ?? [];
       const opzioni = (data as { opzioni_correzione?: OpzioneCorrezione[] }).opzioni_correzione ?? [];
       const suggCotture = (data as { suggerimenti_cotture?: SuggerimentoCottura[] }).suggerimenti_cotture ?? [];
       const scanResults: ScanResult[] = ing.map((i) => {
@@ -1370,6 +1434,7 @@ function TabOttimizzatoreRicette() {
         const a = i.a ?? 0;
         const b = i.b ?? 0;
         const u = i.u ?? 0;
+        const cg = i.cg ?? 0;
         const temp = i.temp ?? 20;
         const melting = i.melting ?? 0;
         const k = i.k ?? 0.3;
@@ -1383,6 +1448,7 @@ function TabOttimizzatoreRicette() {
           asseX,
           asseY,
           d, s, a, b, u,
+          cg,
           loopEdonico,
           temp,
           melting,
@@ -1397,11 +1463,11 @@ function TabOttimizzatoreRicette() {
       setRicetteGenerate({});
       setGeneraLoading(null);
       if (scanResults.length > 0) {
-        setPiattoResult(computePiattoFromResults(scanResults));
+        setPiattoAggregato(computePiattoFromResults(scanResults));
         setPiattoCorrettoResults(computeCorrectedFromResults(scanResults, opzioni));
         setSelectedGraphIndex(0);
       } else {
-        setPiattoResult(null);
+        setPiattoAggregato(null);
         setPiattoCorrettoResults([]);
       }
     } catch {
@@ -1426,7 +1492,7 @@ function TabOttimizzatoreRicette() {
   return (
     <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-6 shadow-xl">
       <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
-        Ottimizzatore Ricette
+        Masterchaif
       </h2>
       <form onSubmit={handleSubmit} className="flex flex-col gap-2 mb-6">
         <div className="space-y-3">
@@ -1528,7 +1594,7 @@ function TabOttimizzatoreRicette() {
             type="button"
             onClick={() => {
               setResults([]);
-              setPiattoResult(null);
+              setPiattoAggregato(null);
               setOpzioniCorrezione([]);
               setSuggerimentiCotture([]);
               setPiattoCorrettoResults([]);
@@ -1648,17 +1714,34 @@ function TabOttimizzatoreRicette() {
               const op = opzioniCorrezione[opzioneIndex];
               const corretto = piattoCorrettoResults[opzioneIndex];
               if (!op) return null;
-              const miglioraS = piattoResult && corretto && (corretto.soddisfazione >= (piattoResult.soddisfazione ?? 0));
+              const miglioraS = piattoAggregato && corretto && (corretto.soddisfazione >= (piattoAggregato.soddisfazione ?? 0));
+              const graphIndex = opzioneIndex + 1;
+              const isSelectedCard = selectedGraphIndex === graphIndex;
               return (
                 <div
                   key={opzioneIndex}
-                  className="rounded-lg border border-emerald-700/50 bg-emerald-950/20 p-3 cursor-pointer hover:border-emerald-600/60 transition-colors"
-                  onClick={() => setSelectedGraphIndex(displayIdx + 1)}
+                  className={
+                    'rounded-lg border p-3 cursor-pointer transition-colors ' +
+                    (isSelectedCard
+                      ? 'border-emerald-400 bg-emerald-900/60 shadow-[0_0_0_1px_rgba(16,185,129,0.8)]'
+                      : 'border-emerald-700/50 bg-emerald-950/20 hover:border-emerald-600/60')
+                  }
+                  onClick={() => setSelectedGraphIndex(graphIndex)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedGraphIndex(displayIdx + 1); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedGraphIndex(graphIndex);
+                    }
+                  }}
                 >
-                  <p className="font-medium text-emerald-200">{op.nome}</p>
+                  <p className="font-medium text-emerald-200 flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-700 text-[10px] font-semibold text-white">
+                      #{graphIndex}
+                    </span>
+                    <span className="truncate">{op.nome}</span>
+                  </p>
                   <p className="text-xs text-zinc-400 mt-1">{op.descrizione}</p>
                   {(op.modifiche_grammi?.length ?? 0) > 0 && (
                     <>
@@ -1692,16 +1775,16 @@ function TabOttimizzatoreRicette() {
                       </ul>
                     </>
                   )}
-                  {corretto && piattoResult && (
+                  {corretto && piattoAggregato && (
                     <>
                       <p className="text-xs mt-2 text-emerald-300">
                         Risultato: <strong>Magnitudo M</strong> = {corretto.magnitudo.toFixed(2)} · <strong>Soddisfazione S</strong> = {corretto.soddisfazione.toFixed(0)}/100
                         {miglioraS && <span className="ml-1 text-emerald-400 font-medium">↑ migliora S</span>}
                       </p>
                       <p className="text-xs mt-1 text-zinc-400">
-                        Delta vs originale: <strong className={corretto.magnitudo >= (piattoResult.magnitudo ?? 0) ? 'text-emerald-400' : 'text-red-400'}>ΔM = {(corretto.magnitudo - (piattoResult.magnitudo ?? 0)) >= 0 ? '+' : ''}{(corretto.magnitudo - (piattoResult.magnitudo ?? 0)).toFixed(2)}</strong>
+                        Delta vs originale: <strong className={corretto.magnitudo >= (piattoAggregato.magnitudo ?? 0) ? 'text-emerald-400' : 'text-red-400'}>ΔM = {(corretto.magnitudo - (piattoAggregato.magnitudo ?? 0)) >= 0 ? '+' : ''}{(corretto.magnitudo - (piattoAggregato.magnitudo ?? 0)).toFixed(2)}</strong>
                         {' · '}
-                        <strong className={corretto.soddisfazione >= (piattoResult.soddisfazione ?? 0) ? 'text-emerald-400' : 'text-red-400'}>ΔS = {(corretto.soddisfazione - (piattoResult.soddisfazione ?? 0)) >= 0 ? '+' : ''}{(corretto.soddisfazione - (piattoResult.soddisfazione ?? 0)).toFixed(0)}</strong>
+                        <strong className={corretto.soddisfazione >= (piattoAggregato.soddisfazione ?? 0) ? 'text-emerald-400' : 'text-red-400'}>ΔS = {(corretto.soddisfazione - (piattoAggregato.soddisfazione ?? 0)) >= 0 ? '+' : ''}{(corretto.soddisfazione - (piattoAggregato.soddisfazione ?? 0)).toFixed(0)}</strong>
                       </p>
                       {(corretto.soddisfazione < SOGLIA_SODDISFAZIONE_MIN || !miglioraS) && (
                         <span className="block text-amber-400/90 text-xs mt-0.5">Miglioramento insufficiente (S &lt; {SOGLIA_SODDISFAZIONE_MIN} o S non aumenta).</span>
@@ -1709,7 +1792,7 @@ function TabOttimizzatoreRicette() {
                       <span className="block text-zinc-500 text-xs mt-0.5">Ideale: M ≈ 7,5, S alto.</span>
                     </>
                   )}
-                  {corretto && !piattoResult && (
+                  {corretto && !piattoAggregato && (
                     <p className="text-xs mt-2 text-emerald-300">
                       Risultato: <strong>M</strong> = {corretto.magnitudo.toFixed(2)} · <strong>S</strong> = {corretto.soddisfazione.toFixed(0)}/100
                     </p>
@@ -1806,6 +1889,11 @@ function TabOttimizzatoreRicette() {
               <span className="text-sm font-medium shrink-0">
                 {selectedGraphIndex >= 1 ? 'Hai selezionato: correzione per bilanciare il piatto — ' : 'Stai guardando: '}
               </span>
+              {selectedGraphIndex >= 1 && (
+                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-emerald-700 text-[10px] font-semibold text-white">
+                  #{selectedGraphIndex}
+                </span>
+              )}
               <span className="font-semibold truncate text-[#fafafa]" title={graphPoints[selectedGraphIndex]?.alimento ?? ''}>
                 {graphPoints[selectedGraphIndex]?.alimento ?? '—'}
               </span>
@@ -1830,44 +1918,88 @@ function TabOttimizzatoreRicette() {
             >
               <canvas ref={canvasRef} className="block w-full h-full" style={{ width: '100%', height: 260, position: 'relative', zIndex: 5 }} aria-label="Curva di Gauss" />
               {graphPoints.map((r: ScanResult, i: number) => {
-              const leftPct = 5 + (r.asseX / 100) * 90;
-              const bottomPct = 12 + (r.asseY / 100) * 76;
-              const inRedZone = r.magnitudo > 8;
-              const hackedTexture = r.melting > 4;
-              const hackedTemp = r.temp < 6;
-              const isOriginal = i === 0;
-              const isSelected = selectedGraphIndex === i;
-              const color = isOriginal ? '#3b82f6' : '#22c55e';
-              const selectedColor = isOriginal ? '#f97316' : '#10b981';
-              return (
-                <button
-                  type="button"
-                  key={i}
-                  onClick={() => setSelectedGraphIndex(i)}
-                  style={{ position: 'absolute', left: `${leftPct}%`, bottom: `${bottomPct}%`, transform: 'translate(-50%, 50%)', zIndex: 20, padding: 0, border: 'none', background: 'none', cursor: 'pointer', outline: 'none' }}
-                  aria-label={`Seleziona ${r.alimento} nel radar`}
-                >
-                  <div
-                    className={inRedZone ? 'scan-detector-red-aura' : ''}
+                const leftPct = 5 + (r.asseX / 100) * 90;
+                const bottomPct = 12 + (r.asseY / 100) * 76;
+                const inRedZone = r.magnitudo > 8;
+                const hackedTexture = r.melting > 4;
+                const hackedTemp = r.temp < 6;
+                const isOriginal = i === 0;
+                const isSelected = selectedGraphIndex === i;
+                const color = isOriginal ? '#3b82f6' : '#22c55e';
+                const selectedColor = isOriginal ? '#f97316' : '#10b981';
+                const labelShort = isOriginal ? 'Base' : `#${i}`;
+                return (
+                  <button
+                    type="button"
+                    key={i}
+                    onClick={() => setSelectedGraphIndex(i)}
                     style={{
-                      width: 16,
-                      height: 16,
-                      backgroundColor: isSelected ? selectedColor : color,
-                      borderRadius: '50%',
-                      boxShadow: inRedZone ? undefined : (isSelected ? `0 0 14px ${selectedColor}` : `0 0 12px ${color}80`),
+                      position: 'absolute',
+                      left: `${leftPct}%`,
+                      bottom: `${bottomPct}%`,
+                      transform: 'translate(-50%, 50%)',
+                      zIndex: 20,
+                      padding: 0,
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      outline: 'none',
                     }}
-                  />
-                  <span style={{ position: 'absolute', left: '50%', bottom: '100%', transform: 'translateX(-50%)', marginBottom: 4, fontSize: 11, fontWeight: 700, color: '#ffffff', textShadow: '0 0 4px #000, 0 1px 2px #000', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-                    {r.alimento}
-                  </span>
-                  {(hackedTexture || hackedTemp) && (
-                    <span style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', marginTop: 2, fontSize: 9, color: '#a1a1aa', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-                      {hackedTexture && hackedTemp ? 'HACKED BY TEXTURE + TEMPERATURE' : hackedTexture ? 'HACKED BY TEXTURE' : 'HACKED BY TEMPERATURE'}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                    aria-label={`Seleziona ${r.alimento} nel radar`}
+                  >
+                    <div
+                      className={inRedZone ? 'scan-detector-red-aura' : ''}
+                      style={{
+                        width: 16,
+                        height: 16,
+                        backgroundColor: isSelected ? selectedColor : color,
+                        borderRadius: '50%',
+                        boxShadow: inRedZone ? undefined : isSelected ? `0 0 14px ${selectedColor}` : `0 0 12px ${color}80`,
+                      }}
+                    />
+                    {isSelected && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: '50%',
+                          bottom: '100%',
+                          transform: 'translateX(-50%)',
+                          marginBottom: 4,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: '#ffffff',
+                          textShadow: '0 0 4px #000, 0 1px 2px #000',
+                          whiteSpace: 'nowrap',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        {labelShort}
+                      </span>
+                    )}
+                    {(hackedTexture || hackedTemp) && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: '50%',
+                          top: '100%',
+                          transform: 'translateX(-50%)',
+                          marginTop: 2,
+                          fontSize: 9,
+                          color: '#a1a1aa',
+                          whiteSpace: 'nowrap',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        {hackedTexture && hackedTemp
+                          ? 'HACKED BY TEXTURE + TEMPERATURE'
+                          : hackedTexture
+                            ? 'HACKED BY TEXTURE'
+                            : 'HACKED BY TEMPERATURE'}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-900/80 overflow-hidden">
