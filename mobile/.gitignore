@@ -1,0 +1,8 @@
+# Env (chiavi private)
+.env
+
+# Flutter
+.dart_tool/
+.build/
+*.iml
+pubspec.lock
