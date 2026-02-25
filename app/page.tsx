@@ -607,49 +607,6 @@ function TabScanDetector() {
           })}
         </div>
       )}
-      {piattoAggregato && (
-        <div className="mb-6 rounded-lg border border-zinc-800 bg-[#09090b] p-4">
-          {(() => {
-            const det = dettaglioCalcolo(piattoAggregato);
-            const analisi = piccolaAnalisi(piattoAggregato, det);
-            return (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                  <h3 className="text-sm font-semibold text-[#fafafa]">Analisi del piatto originale</h3>
-                  <button
-                    type="button"
-                    disabled={savingCostaIndex}
-                    onClick={handleSavePiattoToCostaIndex}
-                    className="text-xs px-3 py-1 rounded-full border border-emerald-600 text-emerald-200 hover:bg-emerald-900/60 disabled:opacity-60"
-                  >
-                    {savingCostaIndex ? 'Salvataggio…' : 'Vedi questo piatto in Costa Index'}
-                  </button>
-                </div>
-                <p className="text-xs text-zinc-500 mb-2">
-                  Sintesi complessiva (prima delle correzioni) calcolata come fusione tra media pesata degli ingredienti e picchi di saturazione.
-                </p>
-                <p className="text-sm text-[#fafafa]">
-                  <span className="text-zinc-500">Magnitudo M globale</span> = {det.M.toFixed(2)} ·{' '}
-                  <span className="text-zinc-500">Soddisfazione S globale</span> = {piattoAggregato.soddisfazione.toFixed(0)}/100
-                </p>
-                <div className="mt-3 pt-3 border-t border-zinc-800 text-xs text-zinc-400 space-y-2">
-                  <p className="font-medium text-zinc-500">Lettura laboratorio</p>
-                  <p>{analisi.profilo}</p>
-                  <p>{analisi.magnitudo}</p>
-                  {analisi.correzioni.length > 0 && (
-                    <ul className="list-disc list-inside space-y-1">
-                      {analisi.correzioni.map((c, j) => (
-                        <li key={j}>{c}</li>
-                      ))}
-                    </ul>
-                  )}
-                  <p className="text-[#e4e4e7]">{analisi.sintesi}</p>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      )}
 
       <div className="mt-8 flex flex-col lg:flex-row gap-6">
         <div className="flex-1 min-w-0" style={{ paddingLeft: 28, paddingBottom: 28 }}>
