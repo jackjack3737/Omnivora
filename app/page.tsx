@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import {
   calcolaFatigue,
@@ -10,10 +11,8 @@ import {
 } from '@/lib/biochimica';
 import {
   type ScanResult,
-  type CostaIndexItem,
   type OpzioneCorrezione,
   type SuggerimentoCottura,
-  COSTA_INDEX_TABLE,
   COTTURA_LABELS,
   getEffectiveProfile,
   soddisfazioneAdulto,
@@ -23,15 +22,13 @@ import {
   virtualWeight,
   computePiattoFromResults,
   computeCorrectedFromResults,
-  computeCostaIndex,
 } from '@/lib/scan';
 import { RadarChartPentagon } from '@/components/RadarChart';
 import { LaboratoryReport01 } from '@/components/LaboratoryReport';
-import { AddToCostaIndexButton } from '@/components/AddToCostaIndexButton';
-import { itemColor, CostaIndexRadarMulti, CostaIndexSystemicChart } from '@/components/CostaIndexCharts';
 import SintetizzatoreVegano from '@/components/SintetizzatoreVegano';
+import { IbsDashboard } from '@/components/IbsDashboard';
 
-type TabId = 'sintetizzatore' | 'ottimizzatore' | 'svuota-frigo' | 'radar-km0' | 'costa-index';
+type TabId = 'sintetizzatore' | 'ottimizzatore' | 'analizzatore-ia' | 'svuota-frigo' | 'radar-km0';
 
 type Microelementi = {
   ingrediente_id?: string;
@@ -73,8 +70,8 @@ function toNum(v: unknown): number {
 }
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'costa-index', label: 'Costa Index' },
   { id: 'ottimizzatore', label: 'Masterchaif' },
+  { id: 'analizzatore-ia', label: 'Analizzatore IA' },
   { id: 'sintetizzatore', label: 'Sintetizzatore Vegano' },
   { id: 'svuota-frigo', label: 'Svuota Frigo' },
   { id: 'radar-km0', label: 'Radar Km 0' },
@@ -251,10 +248,18 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#09090b] text-[#fafafa] font-sans">
       <div className="max-w-4xl mx-auto px-4 py-5 sm:p-8">
-        <h1 className="text-3xl sm:text-4xl font-black text-[#dc2626] mb-2 uppercase tracking-tighter">
-          Omnivora
-        </h1>
-        <p className="text-zinc-500 mb-4 sm:mb-6 font-mono text-sm">Suite di Laboratorio</p>
+        <div className="flex flex-wrap items-baseline gap-3 mb-4 sm:mb-6">
+          <h1 className="text-3xl sm:text-4xl font-black text-[#dc2626] uppercase tracking-tighter">
+            Omnivora
+          </h1>
+          <p className="text-zinc-500 font-mono text-sm">Suite di Laboratorio</p>
+          <Link
+            href="/ibs"
+            className="text-sm text-emerald-400 hover:text-emerald-300 font-medium"
+          >
+            Dashboard IBS 2.0 →
+          </Link>
+        </div>
 
         <nav
           className="flex overflow-x-auto overflow-y-hidden gap-0 border-b border-zinc-800 mb-4 sm:mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide"
@@ -284,10 +289,14 @@ export default function Home() {
             <SintetizzatoreVegano />
           </section>
         )}
-        {activeTab === 'ottimizzatore' && <TabOttimizzatoreRicette onOpenCostaIndex={() => setActiveTab('costa-index')} />}
+        {activeTab === 'ottimizzatore' && <TabOttimizzatoreRicette />}
+        {activeTab === 'analizzatore-ia' && (
+          <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 sm:p-6 shadow-xl">
+            <IbsDashboard title="Analizzatore IA" />
+          </section>
+        )}
         {activeTab === 'svuota-frigo' && <TabSvuotaFrigo />}
         {activeTab === 'radar-km0' && <TabRadarKm0 />}
-        {activeTab === 'costa-index' && <TabCostaIndex />}
       </div>
     </div>
   );
@@ -773,369 +782,18 @@ function TabScanDetector() {
       </div>
 
       {radarResult && (
-        <>
-          <div className="mt-4 flex justify-center">
-            <AddToCostaIndexButton result={radarResult} />
-          </div>
-          <LaboratoryReport01
-            result={radarResult}
-            distanzaMolecolare={
-              results.length >= 2
-                ? distanzaMolecolare(results[results.length - 2], results[results.length - 1])
-                : null
-            }
-          />
-        </>
+        <LaboratoryReport01
+          result={radarResult}
+          distanzaMolecolare={
+            results.length >= 2
+              ? distanzaMolecolare(results[results.length - 2], results[results.length - 1])
+              : null
+          }
+        />
       )}
     </section>
   );
 }
-
-function TabCostaIndex() {
-  const [items, setItems] = useState<CostaIndexItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [focusedIndex, setFocusedIndex] = useState<number>(0);
-  const [alimento, setAlimento] = useState('');
-  const [scanLoading, setScanLoading] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [suggerimentiDb, setSuggerimentiDb] = useState<{ id: string; nome: string }[]>([]);
-  const [suggerimentiOpen, setSuggerimentiOpen] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const fetchSuggerimenti = useCallback(async (q: string) => {
-    const trimmed = q.trim();
-    if (trimmed.length < 2) {
-      setSuggerimentiDb([]);
-      return;
-    }
-    const { data } = await supabase
-      .from('matrice_ingredienti')
-      .select('id, nome')
-      .ilike('nome', `%${trimmed}%`)
-      .limit(20);
-    setSuggerimentiDb((data ?? []).map((r: { id: string; nome: string }) => ({ id: r.id, nome: r.nome })));
-    setSuggerimentiOpen(true);
-  }, []);
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!alimento.trim()) {
-      setSuggerimentiDb([]);
-      setSuggerimentiOpen(false);
-      return;
-    }
-    debounceRef.current = setTimeout(() => { fetchSuggerimenti(alimento); }, 300);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [alimento, fetchSuggerimenti]);
-
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    setFetchError(null);
-    const { data, error } = await supabase
-      .from(COSTA_INDEX_TABLE)
-      .select('id, payload')
-      .order('created_at', { ascending: true });
-    if (error) {
-      setItems([]);
-      setFetchError(error.message || 'Errore caricamento Costa Index');
-    } else {
-      setItems((data ?? []).map((row: { id: string; payload: ScanResult }) => ({ id: row.id, ...row.payload })));
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
-  const handleScanAndAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = alimento.trim();
-    if (!trimmed) return;
-    setScanLoading(true);
-    setScanError(null);
-    try {
-      const res = await fetch('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alimento: trimmed }),
-      });
-      const rawText = await res.text();
-      let data: {
-        error?: string;
-        d?: number; s?: number; a?: number; b?: number; u?: number; cg?: number;
-        temp?: number; melting?: number; oscore?: number; k?: number;
-        analisi_molecolare?: string;
-      };
-      try {
-        data = rawText ? (JSON.parse(rawText) as typeof data) : {};
-      } catch {
-        setScanError(res.ok ? 'Risposta API non valida' : (rawText || `Errore ${res.status}`).slice(0, 200));
-        return;
-      }
-      if (!res.ok) {
-        setScanError(data.error || rawText.slice(0, 150) || `Errore ${res.status}`);
-        return;
-      }
-      const d = Number(data.d ?? 0);
-      const s = Number(data.s ?? 0);
-      const a = Number(data.a ?? 0);
-      const b = Number(data.b ?? 0);
-      const u = Number(data.u ?? 0);
-      const cg = Number(data.cg ?? 0);
-      const temp = data.temp !== undefined ? Number(data.temp) : 20;
-      const melting = data.melting !== undefined ? Number(data.melting) : 0;
-      const oscore = data.oscore !== undefined ? Number(data.oscore) : 1;
-      const k = data.k !== undefined ? Number(data.k) : 0.3;
-      const { S, M, loopEdonico } = soddisfazioneAdulto(d, s, a, b, u, temp, melting, oscore, k);
-      const asseX = Math.min((M / 12) * 100, 100);
-      const asseY = Math.min(100, S);
-      const newResult: ScanResult = {
-        alimento: trimmed,
-        magnitudo: M,
-        soddisfazione: asseY,
-        asseX,
-        asseY,
-        d, s, a, b, u,
-        cg,
-        loopEdonico,
-        temp,
-        melting,
-        k,
-        analisi_molecolare: typeof data.analisi_molecolare === 'string' ? data.analisi_molecolare : undefined,
-      };
-      const { error } = await supabase.from(COSTA_INDEX_TABLE).insert({ payload: newResult });
-      if (error) throw error;
-      setAlimento('');
-      await fetchItems();
-    } catch (err) {
-      setScanError(err instanceof Error ? err.message : 'Errore di connessione o salvataggio');
-    } finally {
-      setScanLoading(false);
-    }
-  };
-
-  const focusedItem = items.length > 0 && focusedIndex >= 0 && focusedIndex < items.length ? items[focusedIndex]! : items[0] ?? null;
-  const costaEsito = computeCostaIndex(focusedItem);
-  const costaIndex = costaEsito?.costaIndex ?? 0;
-  const gaugeColor = costaIndex < 50 ? '#ef4444' : costaIndex < 75 ? '#eab308' : '#22c55e';
-
-  const removeItem = async (index: number) => {
-    const item = items[index];
-    if (!item) return;
-    const id = item.id;
-    const { error } = await supabase.from(COSTA_INDEX_TABLE).delete().eq('id', id);
-    if (error) return;
-    const next = items.filter((_, i) => i !== index);
-    setItems(next);
-    if (focusedIndex >= next.length && next.length > 0) setFocusedIndex(next.length - 1);
-    else if (focusedIndex === index && next.length > 0) setFocusedIndex(Math.max(0, index - 1));
-    else if (next.length === 0) setFocusedIndex(0);
-  };
-
-  const svgW = 400;
-  const svgH = 220;
-  const marginX = 0.08;
-  const marginY = 0.14;
-  const chartW = svgW * (1 - 2 * marginX);
-  const chartH = svgH * (1 - 2 * marginY);
-  const left = svgW * marginX;
-  const right = svgW * (1 - marginX);
-  const top = svgH * marginY;
-  const bottom = svgH * (1 - marginY);
-
-  return (
-    <section className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 sm:p-6 shadow-xl">
-      <h2 className="text-xl font-bold text-[#fafafa] border-b border-zinc-800 pb-2 mb-4">
-        Costa Index — Plancia di bio-hacking
-      </h2>
-      <p className="text-zinc-500 text-sm mb-4">
-        Dati salvati su Supabase. Tutti i grafici mostrano tutti gli alimenti; clicca in legenda per mettere a fuoco uno.
-      </p>
-
-      <form onSubmit={handleScanAndAdd} className="flex flex-col sm:flex-row flex-wrap gap-2 mb-6">
-        <div className="flex-1 min-w-0 relative">
-          <input
-            type="text"
-            placeholder="Nome alimento (es. ostriche)..."
-            value={alimento}
-            onChange={(e) => setAlimento(e.target.value)}
-            onFocus={() => suggerimentiDb.length > 0 && setSuggerimentiOpen(true)}
-            onBlur={() => setTimeout(() => setSuggerimentiOpen(false), 180)}
-            disabled={scanLoading}
-            className="w-full bg-[#09090b] border border-zinc-800 rounded-lg p-3 text-[#fafafa] placeholder-zinc-500 focus:border-emerald-600 outline-none disabled:opacity-60 text-base"
-          />
-          {suggerimentiOpen && suggerimentiDb.length > 0 && (
-            <ul
-              className="absolute left-0 right-0 top-full mt-1 z-20 max-h-60 overflow-auto rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl"
-              role="listbox"
-            >
-              {suggerimentiDb.map((row) => (
-                <li
-                  key={row.id}
-                  role="option"
-                  onMouseDown={(e) => { e.preventDefault(); setAlimento(row.nome); setSuggerimentiOpen(false); }}
-                  className="px-3 py-2 text-sm text-[#fafafa] hover:bg-zinc-800 cursor-pointer border-b border-zinc-800 last:border-0"
-                >
-                  {row.nome}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <button
-          type="submit"
-          disabled={scanLoading}
-          className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-3 min-h-[44px] rounded-lg transition-colors disabled:opacity-50"
-        >
-          {scanLoading ? 'Analisi in corso…' : 'Analizza e aggiungi'}
-        </button>
-      </form>
-      {scanError && (
-        <p className="text-red-400 text-sm mb-4">{scanError}</p>
-      )}
-
-      {fetchError && (
-        <div className="rounded-xl border border-amber-800 bg-amber-950/40 p-4 mb-4 text-amber-200 text-sm">
-          <p className="font-medium">Errore Costa Index</p>
-          <p className="mt-1">{fetchError}</p>
-          <p className="mt-2 text-amber-300/80 text-xs">
-            Verifica: variabili Supabase su Vercel (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY), tabella costa_index_items creata in Supabase e policy RLS consentite per anon.
-          </p>
-          <button type="button" onClick={() => fetchItems()} className="mt-2 px-3 py-1.5 rounded bg-amber-700 hover:bg-amber-600 text-white text-xs font-medium">
-            Riprova
-          </button>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="rounded-xl border border-zinc-700 bg-zinc-900/40 p-8 text-center text-zinc-500">
-          Caricamento…
-        </div>
-      ) : items.length === 0 && !fetchError ? (
-        <div className="rounded-xl border border-zinc-700 bg-zinc-900/40 p-8 text-center text-zinc-500">
-          Nessun alimento in Costa Index. Inserisci un alimento nella casella sopra e clicca &quot;Analizza e aggiungi&quot; (analisi con Gemini).
-        </div>
-      ) : items.length === 0 ? null : (
-        <div className="flex flex-col lg:flex-row gap-6">
-          <div className="flex-1 min-w-0 space-y-6">
-            {/* Gauge Costa Index */}
-            <div className="flex flex-col items-center">
-              <span className="text-sm text-zinc-500 mb-1">Costa Index (elemento in focus)</span>
-              <div
-                className="relative w-40 h-40 rounded-full border-8 flex items-center justify-center text-2xl font-bold tabular-nums"
-                style={{
-                  borderColor: gaugeColor,
-                  backgroundColor: 'rgba(0,0,0,0.3)',
-                  color: gaugeColor,
-                }}
-              >
-                {costaIndex}
-              </div>
-              <p className="text-xs text-zinc-500 mt-1">0–100 · Rosso &lt; 50 · Giallo 50–74 · Verde ≥ 75</p>
-            </div>
-
-            {/* Laboratory report */}
-            {focusedItem && (
-              <LaboratoryReport01 result={focusedItem} distanzaMolecolare={null} />
-            )}
-
-            {/* Grafico 1: Gauss */}
-            <div className="rounded-xl border border-zinc-700 overflow-hidden bg-black">
-              <p className="text-xs text-zinc-500 px-3 py-2 border-b border-zinc-700">Curva di Gauss (Soddisfazione) — tutti i pallini</p>
-              <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-auto" style={{ display: 'block' }} xmlns="http://www.w3.org/2000/svg">
-                <rect width={svgW} height={svgH} fill="#000000" />
-                {/* Curva di Gauss base */}
-                <path
-                  fill="none"
-                  stroke="#eab308"
-                  strokeWidth="2"
-                  strokeDasharray="4 3"
-                  d={Array.from({ length: 121 }, (_, i) => {
-                    const m = (i / 120) * 12;
-                    const yVal = 100 * Math.exp(-Math.pow(m - 7.5, 2) / 4.5);
-                    const x = left + (m / 12) * chartW;
-                    const yy = bottom - (yVal / 100) * chartH;
-                    return `${i === 0 ? 'M' : 'L'} ${x} ${yy}`;
-                  }).join(' ')}
-                />
-                {/* Griglia e assi */}
-                {[0, 2, 4, 6, 8, 10, 12].map((m) => {
-                  const x = left + (m / 12) * chartW;
-                  return <line key={m} x1={x} y1={bottom} x2={x} y2={bottom + 6} stroke="#52525b" strokeWidth="1" />;
-                })}
-                {[0, 25, 50, 75, 100].map((v) => {
-                  const yy = bottom - (v / 100) * chartH;
-                  return <line key={v} x1={left - 6} y1={yy} x2={left} y2={yy} stroke="#52525b" strokeWidth="1" />;
-                })}
-                <text x={(left + right) / 2} y={bottom + 20} textAnchor="middle" fill="#a1a1aa" fontSize="11">Magnitudo</text>
-                <text x={left - 30} y={(top + bottom) / 2} textAnchor="middle" fill="#a1a1aa" fontSize="11" transform={`rotate(-90, ${left - 30}, ${(top + bottom) / 2})`}>Soddisfazione</text>
-                {/* Pallini per ogni alimento */}
-                {items.map((r, i) => {
-                  const isFocused = i === focusedIndex;
-                  const opacity = isFocused ? 1 : 0.3;
-                  const color = itemColor(i, items.length);
-                  const x = left + (r.asseX / 100) * chartW;
-                  const y = bottom - (r.asseY / 100) * chartH;
-                  return (
-                    <g key={i}>
-                      <circle cx={x} cy={y} r={isFocused ? 8 : 5} fill={color} stroke="#fff" strokeWidth={isFocused ? 2 : 0} opacity={opacity} />
-                      <text x={x} y={y - 12} textAnchor="middle" fill={color} fontSize={isFocused ? 10 : 8} opacity={opacity}>{r.alimento}</text>
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
-
-            {/* Grafico 2: Radar multiplo */}
-            <div className="rounded-xl border border-zinc-700 overflow-hidden bg-black">
-              <p className="text-xs text-zinc-500 px-3 py-2 border-b border-zinc-700">Radar (Pentagono) — fantasma 3.0 + tutti i poligoni</p>
-              <CostaIndexRadarMulti items={items} focusedIndex={focusedIndex} itemColor={itemColor} />
-            </div>
-
-            {/* Grafico 3: Decadimento P(t) = P0 * e^(-kt) */}
-            <div className="rounded-xl border border-zinc-700 overflow-hidden bg-black">
-              <p className="text-xs text-zinc-500 px-3 py-2 border-b border-zinc-700">Spettro Sistemico (0–120 min) — Sapore, Glicogeno, Fatica, Finestra Anabolica</p>
-              <CostaIndexSystemicChart item={focusedItem} />
-            </div>
-          </div>
-
-          {/* Legenda */}
-          <div className="w-full lg:w-56 flex-shrink-0 rounded-xl border border-zinc-700 bg-zinc-900/60 p-4 h-fit">
-            <h3 className="text-sm font-semibold text-[#fafafa] mb-3">Legenda</h3>
-            <ul className="space-y-2">
-              {items.map((r, i) => {
-                const isFocused = i === focusedIndex;
-                const color = itemColor(i, items.length);
-                return (
-                  <li
-                    key={r.id}
-                    className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-zinc-800/80 transition-colors"
-                    style={{ opacity: isFocused ? 1 : 0.7 }}
-                    onClick={() => setFocusedIndex(i)}
-                  >
-                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                    <span className="text-sm text-[#fafafa] truncate flex-1 min-w-0" title={r.alimento}>{r.alimento}</span>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); removeItem(i); }}
-                      className="text-zinc-500 hover:text-red-400 text-lg leading-none px-1"
-                      aria-label="Rimuovi"
-                    >
-                      ×
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
 
 type RigaIngrediente = { ingrediente: string; grammi: number; cottura: string };
 

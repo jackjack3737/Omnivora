@@ -487,3 +487,214 @@ export function getCostaIndexChartData(item: ScanResult, options: CostaIndexChar
 
   return { ptsEbbrezza, ptsContoFatica, ptsGBR, ptsSensory, ptsWindow, R_gly, R_hep, R_dop, Conto };
 }
+
+// ─── IBS 2.0 — The Taste Engine (11 vettori) ──────────────────────────────────
+
+/**
+ * Vettore statico "DNA" di un ingrediente crudo nella tabella `ingredienti_unificati`.
+ * Tutti i valori sono espressi su scala 0–100.
+ *
+ * Mappatura sui simboli della formula IBS:
+ * - U  (Umami)        -> v_sapidita_u
+ * - S  (Salato)       -> v_salinita_s
+ * - A  (Acido)        -> v_acidita_a
+ * - Am (Amaro)        -> v_amarezza_b
+ * - D  (Dolce)        -> v_dolcezza_d
+ * - G  (Grasso)       -> indice_grasso_texture
+ * - Cr (Croccante)    -> croccantezza_suono
+ * - W  (Umidità)      -> succulenza_umidita
+ * - K  (Kokumi)       -> v_kokumi_k
+ * - Amil (Amilaceo)   -> v_amilaceo_amil
+ * - Ca (Calcio/Astr.) -> v_calcio_ca
+ */
+export type TasteVector11 = {
+  v_sapidita_u: number;
+  v_salinita_s: number;
+  v_acidita_a: number;
+  v_amarezza_b: number;
+  v_dolcezza_d: number;
+  indice_grasso_texture: number;
+  croccantezza_suono: number;
+  succulenza_umidita: number;
+  v_kokumi_k: number;
+  v_amilaceo_amil: number;
+  v_calcio_ca: number;
+};
+
+/** ID logico di una tecnica di cottura (colonna in `composizione_piatti`). */
+export type CookingTechniqueId = string;
+
+/**
+ * Trasformatore di cottura: per ogni tecnica possiamo sommare e/o moltiplicare i vettori.
+ * I valori sono delta / moltiplicatori in scala 0–100; il clamping 0–100 è fatto dopo.
+ */
+export type CookingTechniqueTransform = {
+  add?: Partial<TasteVector11>;
+  mul?: Partial<TasteVector11>;
+};
+
+/**
+ * Dizionario di base per `tecniche_cottura`.
+ * Nota: è pensato come default lato client; in produzione i valori possono arrivare
+ * anche da Supabase mantenendo la stessa semantica (add/mul su 0–100).
+ */
+export const TECNICHE_COTTURA_BASE: Record<CookingTechniqueId, CookingTechniqueTransform> = {
+  crudo: {
+    add: {},
+    mul: {},
+  },
+  fritto: {
+    add: {
+      indice_grasso_texture: 40,
+    },
+    mul: {
+      croccantezza_suono: 5,
+    },
+  },
+  griglia: {
+    add: {
+      v_amarezza_b: 10,
+      indice_grasso_texture: 10,
+    },
+    mul: {
+      succulenza_umidita: 0.8,
+    },
+  },
+  bollito: {
+    mul: {
+      croccantezza_suono: 0.4,
+      succulenza_umidita: 1.1,
+    },
+  },
+  forno: {
+    add: {
+      v_dolcezza_d: 5,
+    },
+    mul: {
+      croccantezza_suono: 1.5,
+    },
+  },
+};
+
+function clampTaste(v: number): number {
+  if (Number.isNaN(v)) return 0;
+  return Math.max(0, Math.min(100, v));
+}
+
+/**
+ * Applica una tecnica di cottura a un vettore statico 0–100 restituendo il vettore trasformato.
+ * Se la tecnica non è definita in `TECNICHE_COTTURA_BASE`, il vettore resta invariato.
+ */
+export function applyCookingTechniqueVector(
+  base: TasteVector11,
+  tecnica: CookingTechniqueId | null | undefined,
+  overrides?: Record<CookingTechniqueId, CookingTechniqueTransform>
+): TasteVector11 {
+  const table = overrides ?? TECNICHE_COTTURA_BASE;
+  const tf = tecnica ? table[tecnica] : undefined;
+  if (!tf) return { ...base };
+
+  const add = tf.add ?? {};
+  const mul = tf.mul ?? {};
+
+  const withMul = <K extends keyof TasteVector11>(key: K): number => {
+    const raw = base[key] ?? 0;
+    const m = (mul[key] ?? 1) as number;
+    return raw * m;
+  };
+  const withAdd = <K extends keyof TasteVector11>(key: K, current: number): number => {
+    const delta = (add[key] ?? 0) as number;
+    return current + delta;
+  };
+
+  const out: TasteVector11 = {
+    v_sapidita_u: 0,
+    v_salinita_s: 0,
+    v_acidita_a: 0,
+    v_amarezza_b: 0,
+    v_dolcezza_d: 0,
+    indice_grasso_texture: 0,
+    croccantezza_suono: 0,
+    succulenza_umidita: 0,
+    v_kokumi_k: 0,
+    v_amilaceo_amil: 0,
+    v_calcio_ca: 0,
+  };
+
+  (Object.keys(out) as (keyof TasteVector11)[]).forEach((key) => {
+    const afterMul = withMul(key);
+    const afterAdd = withAdd(key, afterMul);
+    out[key] = clampTaste(afterAdd);
+  });
+
+  return out;
+}
+
+/** Risultato del calcolo IBS 4.0 (motore neurogastronomico) per un vettore 11D. */
+export type IBSResult = {
+  /** Magnitudo assoluta pre-normalizzazione (rDop * cDyn * fReset). */
+  ibsRaw: number;
+  /** Valore normalizzato 0–100. */
+  ibsPercent: number;
+  /** I tre pilastri IBS 4.0: Drive dopaminergico, Contrasto dinamico, Clearance recettoriale. */
+  components: {
+    drive: number;
+    contrasto: number;
+    reset: number;
+  };
+};
+
+/**
+ * Calcola l’IBS 4.0 (motore neurogastronomico) per un vettore 11D già eventualmente
+ * trasformato dalla tecnica di cottura.
+ *
+ * Segnale grezzo (U×S, D×Amil, G×K) → modulazione sazietà (burden vs cleansers) →
+ * segnale netto → sigmoide (midpoint 60, steepness 0.035) → IBS 0–100.
+ */
+export function calcolaIBS(vec: TasteVector11): IBSResult {
+  const U = clampTaste(vec.v_sapidita_u);
+  const S = clampTaste(vec.v_salinita_s);
+  const K = clampTaste(vec.v_kokumi_k);
+  const G = clampTaste(vec.indice_grasso_texture);
+  const A = clampTaste(vec.v_acidita_a);
+  const Am = clampTaste(vec.v_amarezza_b);
+  const D = clampTaste(vec.v_dolcezza_d);
+  const Amil = clampTaste(vec.v_amilaceo_amil);
+  const Cr = clampTaste(vec.croccantezza_suono);
+  const W = clampTaste(vec.succulenza_umidita);
+  const Ca = clampTaste(vec.v_calcio_ca);
+
+  const rawSavory = (U * S) / 100;
+  const rawComfort = (D * Amil) / 100;
+  const rawFat = G * (1 + K / 100);
+  const rawSignal = rawSavory + rawComfort + rawFat;
+
+  const burden = G + (D > 50 ? D - 50 : 0);
+  const cleansers = A + Am + Ca;
+  const stucchevolezza = Math.max(0, burden - cleansers);
+  const sssMultiplier = Math.max(0.3, 1 - stucchevolezza / 100);
+
+  const glycogenBurnRate = D * 1.5 + Amil - G * 0.5;
+  const fatiguePredictor = Math.max(0, glycogenBurnRate - U * 2);
+  const metabolicWindow = Math.max(0.2, 1 - fatiguePredictor / 150);
+
+  const netSignal =
+    rawSignal * sssMultiplier * metabolicWindow - fatiguePredictor / 3;
+  const finalSignal = Math.max(0, netSignal);
+
+  const midpoint = 60;
+  const steepness = 0.035;
+  const ibsPercent =
+    100 / (1 + Math.exp(-steepness * (finalSignal - midpoint)));
+
+  return {
+    ibsRaw: finalSignal,
+    ibsPercent: Math.min(100, Math.max(0, ibsPercent)),
+    components: {
+      drive: rawSignal,
+      contrasto: sssMultiplier,
+      reset: finalSignal,
+    },
+  };
+}
+
